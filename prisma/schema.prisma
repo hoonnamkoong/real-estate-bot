@@ -1,0 +1,25 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url = env("POSTGRES_PRISMA_URL") // Uses connection pooling
+  directUrl = env("POSTGRES_URL_NON_POOLING") // Uses direct connection
+}
+
+model SearchSetting {
+  id        Int      @id @default(autoincrement())
+  gu        String   // Region Code or Name
+  type      String   // Transaction Type (e.g., A1)
+  priceMax  Int?
+  areaMin   Int?
+  areaMax   Int?
+  updatedAt DateTime @updatedAt
+}
+
+model PropertyNote {
+  complexId String   @id
+  note      String   // "High", "Mid", "Low"
+  updatedAt DateTime @updatedAt
+}
