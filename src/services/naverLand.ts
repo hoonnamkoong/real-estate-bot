@@ -49,15 +49,17 @@ export class NaverLandService {
         try {
             const { lat, lon } = this.getRegionCoords(cortarNo);
 
-            // Construct Bounding Box (Approx +/- 0.05 deg for ~5km radius)
-            // This ensures we cover the region sufficiently
-            const btm = lat - 0.05;
-            const top = lat + 0.05;
-            const lft = lon - 0.06;
-            const rgt = lon + 0.06;
+            // Construct TIGHTER Bounding Box (Approx +/- 0.02 deg for ~2km radius)
+            // This reduces the chance of bleeding into neighboring districts (e.g. Gangnam vs Songpa)
+            const boxSize = 0.02;
+            const btm = lat - boxSize;
+            const top = lat + boxSize;
+            const lft = lon - boxSize;
+            const rgt = lon + boxSize;
 
             // Prepare Query Params
             const params = new URLSearchParams();
+            params.append('cortarNo', cortarNo); // CRITICAL: Filter by Region Code
             params.append('rletTpCd', 'APT:ABYG:JGC'); // Apartment, Presale, Reconstruction
             params.append('tradTpCd', criteria.tradeType || 'A1'); // A1: Sale
             params.append('z', '14');
@@ -109,7 +111,7 @@ export class NaverLandService {
                 id: item.atclNo,
                 name: item.atclNm,
                 price: item.prc, // e.g. "15억 5,000"
-                households: 0, // Not available in list view usually
+                households: item.totHshldCnt || item.hshldCnt || 0, // Try basic keys
                 area: {
                     m2: item.spc1,
                     pyeong: Math.round(item.spc1 / 3.3)
