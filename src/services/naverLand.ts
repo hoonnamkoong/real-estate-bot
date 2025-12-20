@@ -117,7 +117,7 @@ export class NaverLandService {
                     pyeong: typeof item.spc1 === 'string' ? Math.round(parseFloat(item.spc1) / 3.3) : Math.round(item.spc1 / 3.3)
                 },
                 link: `https://m.land.naver.com/article/info/${item.atclNo}`,
-                note: '',
+                note: undefined,
                 _rawPrice: item.prc // Use "prc" (Man-won number) for filtering
             }));
 
