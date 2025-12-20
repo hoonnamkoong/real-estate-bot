@@ -100,7 +100,7 @@ export function ListingTable({ data, onNoteChange }: ListingTableProps) {
                                 <Text c="red" fw={700} size="lg">{priceStr}</Text>
                             </Group>
 
-                            <Group gap="apart" mb="sm">
+                            <Group justify="space-between" mb="sm">
                                 <Group gap="xs">
                                     <Text size="sm" c="dimmed">면적</Text>
                                     <Text size="sm">{item.area.m2}m² ({item.area.pyeong}평)</Text>
