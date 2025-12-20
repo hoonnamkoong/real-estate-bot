@@ -109,31 +109,20 @@ export class NaverLandService {
             // Map to Property Interface
             const articles = list.map((item: any) => ({
                 id: item.atclNo,
-                name: item.atclNm,
-                price: item.prc, // e.g. "15억 5,000"
-                households: item.totHshldCnt || item.hshldCnt || 0, // Try basic keys
+                name: item.atclNm, // e.g. "Olymipc Family Town"
+                price: item.hanPrc, // Use "hanPrc" for display (e.g. "17억")
+                households: 0, // Not available in 'cluster/articleList' API
                 area: {
-                    m2: item.spc1,
-                    pyeong: Math.round(item.spc1 / 3.3)
+                    m2: typeof item.spc1 === 'string' ? parseFloat(item.spc1) : item.spc1,
+                    pyeong: typeof item.spc1 === 'string' ? Math.round(parseFloat(item.spc1) / 3.3) : Math.round(item.spc1 / 3.3)
                 },
                 link: `https://m.land.naver.com/article/info/${item.atclNo}`,
                 note: '',
-                _rawPrice: item._rawPrice || 0
+                _rawPrice: item.prc // Use "prc" (Man-won number) for filtering
             }));
 
-            // Post-processing: Parse prices if _rawPrice is missing
-            const processed = articles.map((item: any) => {
-                let rawPrice = item._rawPrice;
-                if (!rawPrice && typeof item.price === 'string') {
-                    const parts = item.price.match(/(\d+)억\s*(\d*)/);
-                    if (parts) {
-                        const eok = parseInt(parts[1]) || 0;
-                        const man = parseInt(parts[2].replace(/,/g, '')) || 0;
-                        rawPrice = eok * 10000 + man;
-                    }
-                }
-                return { ...item, _rawPrice: rawPrice };
-            });
+            // Post-processing: No longer needed for price parsing since 'prc' gives number
+            const processed = articles;
 
             return processed;
 
