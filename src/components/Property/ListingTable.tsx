@@ -35,7 +35,7 @@ export function ListingTable({ data, onNoteChange }: ListingTableProps) {
                 <Table.Td>
                     <Text c="red" fw={600}>{priceStr}</Text>
                 </Table.Td>
-                <Table.Td>{item.households}세대</Table.Td>
+
                 <Table.Td>
                     <Group gap="xs">
                         <Text>{item.area.m2}m²</Text>
@@ -74,7 +74,7 @@ export function ListingTable({ data, onNoteChange }: ListingTableProps) {
                         <Table.Tr>
                             <Table.Th>단지명</Table.Th>
                             <Table.Th>매매가</Table.Th>
-                            <Table.Th>세대수</Table.Th>
+
                             <Table.Th>면적</Table.Th>
                             <Table.Th>링크</Table.Th>
                             <Table.Th>비고</Table.Th>
@@ -104,10 +104,6 @@ export function ListingTable({ data, onNoteChange }: ListingTableProps) {
                                 <Group gap="xs">
                                     <Text size="sm" c="dimmed">면적</Text>
                                     <Text size="sm">{item.area.m2}m² ({item.area.pyeong}평)</Text>
-                                </Group>
-                                <Group gap="xs">
-                                    <Text size="sm" c="dimmed">세대수</Text>
-                                    <Text size="sm">{item.households}세대</Text>
                                 </Group>
                             </Group>
 
