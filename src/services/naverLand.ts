@@ -110,7 +110,7 @@ export class NaverLandService {
             const articles = list.map((item: any) => ({
                 id: item.atclNo,
                 name: item.atclNm, // e.g. "Olymipc Family Town"
-                price: item.hanPrc, // Use "hanPrc" for display (e.g. "17억")
+                price: typeof item.prc === 'number' ? item.prc : parseInt(item.prc), // Validate Number (Man-won)
                 households: 0, // Not available in 'cluster/articleList' API
                 area: {
                     m2: typeof item.spc1 === 'string' ? parseFloat(item.spc1) : item.spc1,

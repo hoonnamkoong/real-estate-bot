@@ -6,7 +6,7 @@ export interface Property {
     id: string; // Complex ID or Article No
     name: string; // Complex Name
     price: number; // Price in Man-won
-    households: number;
+
     area: { m2: number; pyeong: number };
     link: string; // Naver Real Estate Link
     note?: 'High' | 'Mid' | 'Low';
@@ -99,6 +99,7 @@ export function ListingTable({ data, onNoteChange }: ListingTableProps) {
                                 <Text fw={700} size="lg">{item.name}</Text>
                                 <Text c="red" fw={700} size="lg">{priceStr}</Text>
                             </Group>
+
 
                             <Group justify="space-between" mb="sm">
                                 <Group gap="xs">
