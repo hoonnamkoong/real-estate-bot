@@ -1,6 +1,4 @@
 import { logger } from '@/lib/logger';
-import { spawn } from 'child_process';
-import path from 'path';
 
 // Types for Search Criteria
 export interface SearchCriteria {
@@ -15,76 +13,137 @@ const NAVER_LAND_MOBILE_HOST = 'https://m.land.naver.com';
 
 export class NaverLandService {
 
-    /**
-     * Get Article List using Child Process Scraper
-     */
-    async getArticleList(cortarNo: string, criteria: SearchCriteria) {
-        logger.info('NaverLandService', 'Spawning Scraper Process', { cortarNo, criteria });
+    // Hardcoded coordinates for each region (approximate center)
+    // Used to construct the API request
+    private getRegionCoords(cortarNo: string) {
+        // Default: Gangnam (1168000000)
+        let lat = 37.517332;
+        let lon = 127.047377;
 
-        return new Promise<any[]>((resolve, reject) => {
-            const scriptPath = path.join(process.cwd(), 'src', 'services', 'scraper.js');
-
-            const args = [cortarNo];
-            if (criteria.priceMax) args.push(String(criteria.priceMax));
-            if (criteria.areaMin) args.push(String(criteria.areaMin));
-            if (criteria.roomCount) args.push(String(criteria.roomCount));
-
-            logger.info('NaverLandService', 'Exec', { scriptPath, args });
-
-            const child = spawn('node', [scriptPath, ...args]);
-
-            let stdout = '';
-            let stderr = '';
-
-            child.stdout.on('data', (data) => {
-                stdout += data.toString();
-            });
-
-            child.stderr.on('data', (data) => {
-                stderr += data.toString();
-            });
-
-            child.on('close', (code) => {
-                if (stderr) logger.info('NaverLandService', 'Scraper Stderr', { stderr });
-
-                if (code !== 0) {
-                    logger.error('NaverLandService', 'Scraper Process Failed', { code, stderr });
-                    resolve([]);
-                    return;
-                }
-
-                try {
-                    const list = JSON.parse(stdout);
-                    logger.info('NaverLandService', 'Scraper Success', { count: list.length });
-
-                    if (!Array.isArray(list)) {
-                        logger.warn('NaverLandService', 'Scraper returned non-array', { stdout });
-                        resolve([]);
-                        return;
-                    }
-
-                    const articles = list.map((item: any) => ({
-                        id: item.atclNo,
-                        name: item.atclNm,
-                        price: item.prc,
-                        households: 0,
-                        area: { m2: item.spc1, pyeong: Math.round(item.spc1 / 3.3) },
-                        link: `https://m.land.naver.com/article/info/${item.atclNo}`,
-                        note: '',
-                        _rawPrice: item._rawPrice
-                    }));
-                    resolve(articles);
-                } catch (e) {
-                    logger.error('NaverLandService', 'JSON Parse Error', { error: e, preview: stdout.slice(0, 100) });
-                    resolve([]);
-                }
-            });
-        });
+        if (cortarNo === '1171000000') { // Songpa
+            lat = 37.514544;
+            lon = 127.105918;
+        } else if (cortarNo === '1165000000') { // Seocho
+            lat = 37.483574;
+            lon = 127.032603;
+        } else if (cortarNo === '1144000000') { // Mapo
+            lat = 37.566283;
+            lon = 126.901642;
+        } else if (cortarNo === '1117000000') { // Yongsan
+            lat = 37.532326;
+            lon = 126.990703;
+        } else if (cortarNo === '1120000000') { // Seongdong
+            lat = 37.563456;
+            lon = 127.036821;
+        }
+        // Add more regions if needed or use a generic fallback
+        return { lat, lon };
     }
 
     /**
-   * Get Region Code (CortarNo)
-   */
+     * Get Article List using Direct API Fetch (No Puppeteer)
+     */
+    async getArticleList(cortarNo: string, criteria: SearchCriteria) {
+        logger.info('NaverLandService', 'Fetching Article List API', { cortarNo, criteria });
+
+        try {
+            const { lat, lon } = this.getRegionCoords(cortarNo);
+
+            // Construct Bounding Box (Approx +/- 0.05 deg for ~5km radius)
+            // This ensures we cover the region sufficiently
+            const btm = lat - 0.05;
+            const top = lat + 0.05;
+            const lft = lon - 0.06;
+            const rgt = lon + 0.06;
+
+            // Prepare Query Params
+            const params = new URLSearchParams();
+            params.append('rletTpCd', 'APT:ABYG:JGC'); // Apartment, Presale, Reconstruction
+            params.append('tradTpCd', criteria.tradeType || 'A1'); // A1: Sale
+            params.append('z', '14');
+            params.append('lat', String(lat));
+            params.append('lon', String(lon));
+            params.append('btm', String(btm.toFixed(7)));
+            params.append('lft', String(lft.toFixed(7)));
+            params.append('top', String(top.toFixed(7)));
+            params.append('rgt', String(rgt.toFixed(7)));
+
+            // Filter by Price/Area directly in API params
+            // Naver API uses 'prc' in format 'min:max' e.g. '0:50000' (Man-won)
+            if (criteria.priceMax) {
+                params.append('prc', `0:${criteria.priceMax}`);
+            }
+            if (criteria.areaMin) {
+                params.append('spcMin', String(criteria.areaMin));
+            }
+            if (criteria.roomCount) {
+                params.append('rom', String(criteria.roomCount));
+            }
+
+            const apiUrl = `${NAVER_LAND_MOBILE_HOST}/cluster/ajax/articleList?${params.toString()}`;
+            logger.info('NaverLandService', 'API URL', { url: apiUrl });
+
+            const response = await fetch(apiUrl, {
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
+                    'Referer': 'https://m.land.naver.com/'
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error(`Naver API Response: ${response.status} ${response.statusText}`);
+            }
+
+            const json = await response.json();
+            const list = json.body || [];
+
+            if (!Array.isArray(list)) {
+                logger.warn('NaverLandService', 'API returned non-array body', { json });
+                return [];
+            }
+
+            logger.info('NaverLandService', 'API Success', { count: list.length });
+
+            // Map to Property Interface
+            const articles = list.map((item: any) => ({
+                id: item.atclNo,
+                name: item.atclNm,
+                price: item.prc, // e.g. "15억 5,000"
+                households: 0, // Not available in list view usually
+                area: {
+                    m2: item.spc1,
+                    pyeong: Math.round(item.spc1 / 3.3)
+                },
+                link: `https://m.land.naver.com/article/info/${item.atclNo}`,
+                note: '',
+                _rawPrice: item._rawPrice || 0
+            }));
+
+            // Post-processing: Parse prices if _rawPrice is missing
+            const processed = articles.map((item: any) => {
+                let rawPrice = item._rawPrice;
+                if (!rawPrice && typeof item.price === 'string') {
+                    const parts = item.price.match(/(\d+)억\s*(\d*)/);
+                    if (parts) {
+                        const eok = parseInt(parts[1]) || 0;
+                        const man = parseInt(parts[2].replace(/,/g, '')) || 0;
+                        rawPrice = eok * 10000 + man;
+                    }
+                }
+                return { ...item, _rawPrice: rawPrice };
+            });
+
+            return processed;
+
+        } catch (error) {
+            logger.error('NaverLandService', 'API Fetch Failed', { error });
+            return [];
+        }
+    }
+
+    /**
+     * Get Region Code (CortarNo)
+     */
     async getRegionCode(keyword: string): Promise<string> {
         const map: Record<string, string> = {
             'gangnam': '1168000000', 'seocho': '1165000000', 'songpa': '1171000000',
