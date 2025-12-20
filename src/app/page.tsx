@@ -1,7 +1,8 @@
 'use client';
 
-import { Container, Stack, Title, Text, LoadingOverlay, Box } from '@mantine/core';
+import { Container, Stack, Title, Text, LoadingOverlay, Box, Group } from '@mantine/core';
 import { useState, useTransition } from 'react';
+import dayjs from 'dayjs';
 import { Header } from '@/components/Layout/Header';
 import { FilterForm, FilterValues } from '@/components/Search/FilterForm';
 import { ListingTable, Property } from '@/components/Property/ListingTable';
@@ -11,12 +12,14 @@ export default function Home() {
   const [properties, setProperties] = useState<Property[]>([]);
   const [isPending, startTransition] = useTransition();
   const [searched, setSearched] = useState(false);
+  const [searchTime, setSearchTime] = useState<string | null>(null);
 
   const handleSearch = (values: FilterValues) => {
     startTransition(async () => {
       const result = await searchProperties(values);
       setProperties(result);
       setSearched(true);
+      setSearchTime(dayjs().format('YYYY-MM-DD HH:mm:ss'));
     });
   };
 
@@ -37,13 +40,27 @@ export default function Home() {
           </Box>
 
           <Box>
-            <Title order={4} mb="md">검색 결과 {searched && `(${properties.length}건)`}</Title>
+            <Group justify="space-between" mb="md" align="center">
+              <Title order={4}>
+                검색 결과 {searched && `(${properties.length}건)`}
+              </Title>
+              {searchTime && (
+                <Text size="sm" c="dimmed">
+                  탐색 시간: {searchTime}
+                </Text>
+              )}
+            </Group>
+
             {properties.length > 0 ? (
               <ListingTable data={properties} onNoteChange={handleNoteChange} />
             ) : (
               searched && <Text c="dimmed" ta="center" py="xl">조건에 맞는 매물이 없습니다.</Text>
             )}
             {!searched && <Text c="dimmed" ta="center" py="xl">검색 조건을 입력하고 검색 버튼을 눌러주세요.</Text>}
+
+            <Text c="dimmed" size="xs" ta="center" mt="xl">
+              Real Estate Bot v1.5 (Telegram Enabled)
+            </Text>
           </Box>
         </Stack>
       </Container>

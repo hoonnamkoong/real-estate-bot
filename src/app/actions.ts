@@ -1,6 +1,7 @@
 'use server';
 
 import { naverLand, SearchCriteria } from '@/services/naverLand';
+import { telegram } from '@/lib/telegram';
 import { prisma } from '@/lib/prisma'; // Need to create this if not exists, or use directly
 import { FilterValues } from '@/components/Search/FilterForm';
 import { Property } from '@/components/Property/ListingTable';
@@ -51,6 +52,38 @@ export async function searchProperties(data: FilterValues): Promise<Property[]> 
 
         return true;
     });
+
+    // 5. Send Telegram Notification (Async)
+    (async () => {
+        try {
+            if (filtered.length === 0) {
+                await telegram.sendMessage(`[부동산 봇] 검색 결과 없음\n조건: ${data.regions.join(',')} ${data.priceMax ? `~${data.priceMax}억` : ''}`);
+                return;
+            }
+
+            const header = `[부동산 봇] 검색 결과 (${filtered.length}건)\n조건: ${data.regions.join(',')} ${data.priceMax}억 이하\n\n`;
+            let message = header;
+            const messages = [];
+
+            for (const item of filtered) {
+                // Name | Price | Link
+                const line = `▪ ${item.name} (${item.price}만원)\n🔗 ${item.link}\n\n`;
+                if (message.length + line.length > 2000) {
+                    messages.push(message);
+                    message = `(이어서)\n\n${line}`;
+                } else {
+                    message += line;
+                }
+            }
+            messages.push(message);
+
+            for (const msg of messages) {
+                await telegram.sendMessage(msg);
+            }
+        } catch (e) {
+            console.error('Failed to send telegram', e);
+        }
+    })();
 
     return filtered;
 }
