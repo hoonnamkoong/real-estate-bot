@@ -9,8 +9,15 @@ import { Property } from '@/components/Property/ListingTable';
 export async function searchProperties(data: FilterValues): Promise<Property[]> {
     // 1. Save Settings to DB (Async, don't block)
     try {
-        // Ideally use real Prisma client
-        // await prisma.searchSetting.create({ ... })
+        await prisma.searchSetting.create({
+            data: {
+                regions: data.regions ? data.regions.join(',') : '',
+                type: data.tradeType,
+                priceMax: data.priceMax,
+                areaMin: data.areaMin,
+                roomCount: data.roomCount,
+            }
+        });
     } catch (e) {
         console.error('Failed to save settings', e);
     }

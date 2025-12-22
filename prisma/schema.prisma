@@ -9,11 +9,12 @@ datasource db {
 
 model SearchSetting {
   id        Int      @id @default(autoincrement())
-  gu        String   // Region Code or Name
+  regions   String   // Comma separated regions
   type      String   // Transaction Type (e.g., A1)
   priceMax  Int?
   areaMin   Int?
   areaMax   Int?
+  roomCount Int?
   updatedAt DateTime @updatedAt
 }
 

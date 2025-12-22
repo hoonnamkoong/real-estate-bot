@@ -17,29 +17,44 @@ export async function GET(request: Request) {
 
     try {
         // 1. Load Last Search Settings
-        // const lastSetting = await prisma.searchSetting.findFirst({ orderBy: { updatedAt: 'desc' } });
-        // Mock for now if no DB
-        const lastSetting = {
-            gu: 'gangnam',
-            type: 'A1',
-            priceMax: 300000,
-        }; // Default fallback
+        const lastSetting = await prisma.searchSetting.findFirst({ orderBy: { updatedAt: 'desc' } });
 
         if (!lastSetting) {
             return NextResponse.json({ success: false, message: 'No settings found' });
         }
 
         // 2. Fetch Data
-        const regionCode = await naverLand.getRegionCode(lastSetting.gu || 'gangnam');
+        // Support multiple regions (comma separated)
+        const regions = lastSetting.regions ? lastSetting.regions.split(',') : ['gangnam'];
+        const cortarNos = await Promise.all(regions.map((r: string) => naverLand.getRegionCode(r)));
+
         const criteria: SearchCriteria = {
             tradeType: (lastSetting.type as any) || 'A1',
-            priceMax: lastSetting.priceMax,
+            priceMax: lastSetting.priceMax ? lastSetting.priceMax * 10000 : undefined, // Check unit!
+            // Wait, schema stores Eok? Actions saves data.priceMax (Eok).
+            // Request to Naver Services expects Man-won.
+            // actions.ts saves "data.priceMax" (Eok, e.g. 20)
+            // naverLand.ts expects Man-won for priceMax (e.g. 200000)
+            // So here we multiply by 10000.
+
+            areaMin: lastSetting.areaMin ?? undefined,
+            roomCount: lastSetting.roomCount ?? undefined
         };
 
-        const results = await naverLand.getArticleList(regionCode, criteria);
+        const resultsArrays = await Promise.all(
+            cortarNos.map((code: string) => naverLand.getArticleList(code, criteria))
+        );
+        const results = resultsArrays.flat();
 
-        // 3. Filter Top Results (e.g., top 5 cheapest or newest)
-        const topListings = results.slice(0, 5); // Just top 5 for report
+        // Filter Logic (Same as actions.ts)
+        const filtered = results.filter((item: any) => {
+            if (criteria.priceMax && item._rawPrice > criteria.priceMax) return false;
+            if (criteria.areaMin && item.area.m2 < criteria.areaMin) return false;
+            return true;
+        });
+
+        // 3. Filter Top Results
+        const topListings = filtered.slice(0, 10); // Top 10
 
         if (topListings.length === 0) {
             await telegram.sendMessage(`📉 **[부동산 봇]**\n조건에 맞는 매물이 없습니다.`);
