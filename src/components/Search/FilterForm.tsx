@@ -18,9 +18,10 @@ export interface FilterValues {
 interface FilterFormProps {
     onSearch: (values: FilterValues) => void;
     loading?: boolean;
+    initialValues?: Partial<FilterValues>;
 }
 
-export function FilterForm({ onSearch, loading }: FilterFormProps) {
+export function FilterForm({ onSearch, loading, initialValues }: FilterFormProps) {
     const form = useForm<FilterValues>({
         initialValues: {
             regions: ['songpa', 'seocho'],
@@ -29,6 +30,7 @@ export function FilterForm({ onSearch, loading }: FilterFormProps) {
             areaMin: 120,   // 120m2
             roomCount: 4,  // 4 rooms
             minHouseholds: 500,
+            ...initialValues
         },
     });
 

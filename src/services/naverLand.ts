@@ -16,42 +16,42 @@ export class NaverLandService {
     // Dong Coordinates Registry (Approximate Centers)
     private DONG_REGISTRY: Record<string, { name: string; lat: number; lon: number }[]> = {
         '1171000000': [ // Songpa-gu
-            { name: 'Jamsil', lat: 37.512, lon: 127.094 },
-            { name: 'Sincheon', lat: 37.520, lon: 127.105 },
-            { name: 'Pungnap', lat: 37.535, lon: 127.115 },
-            { name: 'Songpa', lat: 37.505, lon: 127.115 },
-            { name: 'Seokchon', lat: 37.503, lon: 127.105 },
-            { name: 'Samjeon', lat: 37.502, lon: 127.090 },
-            { name: 'Bangi', lat: 37.515, lon: 127.125 },
-            { name: 'Ogeum', lat: 37.505, lon: 127.135 },
-            { name: 'Garak', lat: 37.495, lon: 127.125 },
-            { name: 'Munjeong', lat: 37.485, lon: 127.125 },
-            { name: 'Jangji', lat: 37.478, lon: 127.135 },
-            { name: 'Geoyeo', lat: 37.495, lon: 127.145 },
-            { name: 'Macheon', lat: 37.495, lon: 127.155 }
+            { name: '잠실', lat: 37.512, lon: 127.094 },
+            { name: '신천', lat: 37.520, lon: 127.105 },
+            { name: '풍납', lat: 37.535, lon: 127.115 },
+            { name: '송파', lat: 37.505, lon: 127.115 },
+            { name: '석촌', lat: 37.503, lon: 127.105 },
+            { name: '삼전', lat: 37.502, lon: 127.090 },
+            { name: '방이', lat: 37.515, lon: 127.125 },
+            { name: '오금', lat: 37.505, lon: 127.135 },
+            { name: '가락', lat: 37.495, lon: 127.125 },
+            { name: '문정', lat: 37.485, lon: 127.125 },
+            { name: '장지', lat: 37.478, lon: 127.135 },
+            { name: '거여', lat: 37.495, lon: 127.145 },
+            { name: '마천', lat: 37.495, lon: 127.155 }
         ],
         '1168000000': [ // Gangnam-gu
-            { name: 'Apgujeong', lat: 37.528, lon: 127.028 },
-            { name: 'Sinsa', lat: 37.522, lon: 127.022 },
-            { name: 'Cheongdam', lat: 37.522, lon: 127.045 },
-            { name: 'Nonhyeon', lat: 37.512, lon: 127.030 },
-            { name: 'Samseong', lat: 37.512, lon: 127.058 },
-            { name: 'Yeoksam', lat: 37.500, lon: 127.038 },
-            { name: 'Daechi', lat: 37.498, lon: 127.060 },
-            { name: 'Dogok', lat: 37.490, lon: 127.045 },
-            { name: 'Gaepo', lat: 37.480, lon: 127.065 },
-            { name: 'Ilwon', lat: 37.485, lon: 127.085 },
-            { name: 'Suseo', lat: 37.488, lon: 127.102 },
-            { name: 'Segok', lat: 37.465, lon: 127.105 }
+            { name: '압구정', lat: 37.528, lon: 127.028 },
+            { name: '신사', lat: 37.522, lon: 127.022 },
+            { name: '청담', lat: 37.522, lon: 127.045 },
+            { name: '논현', lat: 37.512, lon: 127.030 },
+            { name: '삼성', lat: 37.512, lon: 127.058 },
+            { name: '역삼', lat: 37.500, lon: 127.038 },
+            { name: '대치', lat: 37.498, lon: 127.060 },
+            { name: '도곡', lat: 37.490, lon: 127.045 },
+            { name: '개포', lat: 37.480, lon: 127.065 },
+            { name: '일원', lat: 37.485, lon: 127.085 },
+            { name: '수서', lat: 37.488, lon: 127.102 },
+            { name: '세곡', lat: 37.465, lon: 127.105 }
         ],
         '1165000000': [ // Seocho-gu
-            { name: 'Jamwon', lat: 37.515, lon: 127.015 },
-            { name: 'Banpo', lat: 37.505, lon: 127.000 },
-            { name: 'Seocho', lat: 37.488, lon: 127.015 },
-            { name: 'Bangbae', lat: 37.482, lon: 126.995 },
-            { name: 'Yangjae', lat: 37.482, lon: 127.038 },
-            { name: 'Umyeon', lat: 37.465, lon: 127.025 },
-            { name: 'Naegok', lat: 37.455, lon: 127.065 }
+            { name: '잠원', lat: 37.515, lon: 127.015 },
+            { name: '반포', lat: 37.505, lon: 127.000 },
+            { name: '서초', lat: 37.488, lon: 127.015 },
+            { name: '방배', lat: 37.482, lon: 126.995 },
+            { name: '양재', lat: 37.482, lon: 127.038 },
+            { name: '우면', lat: 37.465, lon: 127.025 },
+            { name: '내곡', lat: 37.455, lon: 127.065 }
         ]
     };
 
@@ -210,9 +210,15 @@ export class NaverLandService {
                 dongName: item._dongName
             }));
 
-            // Sort by Date or Price (Optional, but good for UI)
-            // Default to most recent (highest ID usually)
-            articles.sort((a, b) => Number(b.id) - Number(a.id));
+            // Sort by Dong Name then Price (Ascending)
+            articles.sort((a, b) => {
+                const dongA = a.dongName || '';
+                const dongB = b.dongName || '';
+                if (dongA !== dongB) {
+                    return dongA.localeCompare(dongB);
+                }
+                return a.price - b.price;
+            });
 
             return articles;
 

@@ -1,7 +1,8 @@
 'use client';
 
 import { Container, Stack, Title, Text, LoadingOverlay, Box, Group } from '@mantine/core';
-import { useState, useTransition } from 'react';
+import { useState, useTransition, useEffect } from 'react';
+import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import dayjs from 'dayjs';
 import { Header } from '@/components/Layout/Header';
 import { FilterForm, FilterValues } from '@/components/Search/FilterForm';
@@ -14,7 +15,28 @@ export default function Home() {
   const [searched, setSearched] = useState(false);
   const [searchTime, setSearchTime] = useState<string | null>(null);
 
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  // Parse Initial Values from URL
+  const initialFilterValues: Partial<FilterValues> = {};
+  if (searchParams.get('regions')) initialFilterValues.regions = searchParams.get('regions')?.split(',') || [];
+  if (searchParams.get('tradeType')) initialFilterValues.tradeType = searchParams.get('tradeType')!;
+  if (searchParams.get('priceMax')) initialFilterValues.priceMax = Number(searchParams.get('priceMax'));
+  if (searchParams.get('areaMin')) initialFilterValues.areaMin = Number(searchParams.get('areaMin'));
+  if (searchParams.get('roomCount')) initialFilterValues.roomCount = Number(searchParams.get('roomCount'));
+
   const handleSearch = (values: FilterValues) => {
+    // Update URL
+    const params = new URLSearchParams();
+    if (values.regions.length) params.set('regions', values.regions.join(','));
+    if (values.tradeType) params.set('tradeType', values.tradeType);
+    if (values.priceMax) params.set('priceMax', String(values.priceMax));
+    if (values.areaMin) params.set('areaMin', String(values.areaMin));
+    if (values.roomCount) params.set('roomCount', String(values.roomCount));
+    router.replace(`${pathname}?${params.toString()}`);
+
     startTransition(async () => {
       const result = await searchProperties(values);
       setProperties(result);
@@ -22,6 +44,26 @@ export default function Home() {
       setSearchTime(dayjs().format('YYYY-MM-DD HH:mm:ss'));
     });
   };
+
+  // Auto-Search on Mount if Params exist
+  useEffect(() => {
+    if (searchParams.toString() && !searched) {
+      // Reconstruct full values with defaults if needed, or rely on form
+      // Actually we need to call handleSearch with *Values*.
+      // Since the form has the merged values, we can't easily retrieve them here unless we duplicate default logic.
+      // Better approach: Let the form initialize, but here we just construct the object.
+      const values: FilterValues = {
+        regions: initialFilterValues.regions || ['songpa', 'seocho'],
+        tradeType: initialFilterValues.tradeType || 'A1',
+        priceMax: initialFilterValues.priceMax || 20,
+        areaMin: initialFilterValues.areaMin || 120,
+        roomCount: initialFilterValues.roomCount || 4,
+        minHouseholds: 500
+      };
+      handleSearch(values);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run once on mount
 
   const handleNoteChange = async (id: string, note: string) => {
     // Optimistic Update
@@ -36,7 +78,7 @@ export default function Home() {
         <Stack gap="xl">
           <Box pos="relative">
             <LoadingOverlay visible={isPending} overlayProps={{ radius: "sm", blur: 2 }} />
-            <FilterForm onSearch={handleSearch} loading={isPending} />
+            <FilterForm onSearch={handleSearch} loading={isPending} initialValues={initialFilterValues} />
           </Box>
 
           <Box>
