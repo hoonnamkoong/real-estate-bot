@@ -2,13 +2,18 @@ import { NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(request: Request) {
     try {
-        // Exact logic from naverLand.ts
-        const cortarNo = '1171000000'; // Songpa
-        const lat = 37.514544;
-        const lon = 127.105918;
-        const boxSize = 0.08; // 8km
+        const { searchParams } = new URL(request.url);
+
+        // Default: Songpa
+        const cortarNo = searchParams.get('cortarNo') || '1171000000';
+        const lat = parseFloat(searchParams.get('lat') || '37.514544');
+        const lon = parseFloat(searchParams.get('lon') || '127.105918');
+
+        // Allow overriding boxSize and Zoom
+        const boxSize = parseFloat(searchParams.get('box') || '0.02'); // Default to small 0.02
+        const z = searchParams.get('z') || '14';
 
         const btm = lat - boxSize;
         const top = lat + boxSize;
@@ -19,7 +24,7 @@ export async function GET() {
         params.append('cortarNo', cortarNo);
         params.append('rletTpCd', 'APT:ABYG:JGC');
         params.append('tradTpCd', 'A1');
-        params.append('z', '16');
+        params.append('z', z);
         params.append('lat', String(lat));
         params.append('lon', String(lon));
         params.append('btm', String(btm.toFixed(7)));
@@ -27,9 +32,13 @@ export async function GET() {
         params.append('top', String(top.toFixed(7)));
         params.append('rgt', String(rgt.toFixed(7)));
         params.append('page', '1');
-        params.append('prc', '0:200000');
-        params.append('spcMin', '120');
-        params.append('rom', '4');
+
+        // Optional Filters
+        if (searchParams.get('prc')) params.append('prc', searchParams.get('prc')!);
+        else params.append('prc', '0:200000');
+
+        params.append('spcMin', searchParams.get('spcMin') || '120');
+        params.append('rom', searchParams.get('rom') || '4');
 
         const apiUrl = `https://m.land.naver.com/cluster/ajax/articleList?${params.toString()}`;
 
@@ -50,6 +59,7 @@ export async function GET() {
 
         return NextResponse.json({
             status: response.status,
+            config: { z, boxSize, lat, lon },
             apiUrl,
             rawTextLen: text.length,
             isJson: !!json,
