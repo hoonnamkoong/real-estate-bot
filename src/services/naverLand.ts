@@ -13,6 +13,48 @@ const NAVER_LAND_MOBILE_HOST = 'https://m.land.naver.com';
 
 export class NaverLandService {
 
+    // Dong Coordinates Registry (Approximate Centers)
+    private DONG_REGISTRY: Record<string, { name: string; lat: number; lon: number }[]> = {
+        '1171000000': [ // Songpa-gu
+            { name: 'Jamsil', lat: 37.512, lon: 127.094 },
+            { name: 'Sincheon', lat: 37.520, lon: 127.105 },
+            { name: 'Pungnap', lat: 37.535, lon: 127.115 },
+            { name: 'Songpa', lat: 37.505, lon: 127.115 },
+            { name: 'Seokchon', lat: 37.503, lon: 127.105 },
+            { name: 'Samjeon', lat: 37.502, lon: 127.090 },
+            { name: 'Bangi', lat: 37.515, lon: 127.125 },
+            { name: 'Ogeum', lat: 37.505, lon: 127.135 },
+            { name: 'Garak', lat: 37.495, lon: 127.125 },
+            { name: 'Munjeong', lat: 37.485, lon: 127.125 },
+            { name: 'Jangji', lat: 37.478, lon: 127.135 },
+            { name: 'Geoyeo', lat: 37.495, lon: 127.145 },
+            { name: 'Macheon', lat: 37.495, lon: 127.155 }
+        ],
+        '1168000000': [ // Gangnam-gu
+            { name: 'Apgujeong', lat: 37.528, lon: 127.028 },
+            { name: 'Sinsa', lat: 37.522, lon: 127.022 },
+            { name: 'Cheongdam', lat: 37.522, lon: 127.045 },
+            { name: 'Nonhyeon', lat: 37.512, lon: 127.030 },
+            { name: 'Samseong', lat: 37.512, lon: 127.058 },
+            { name: 'Yeoksam', lat: 37.500, lon: 127.038 },
+            { name: 'Daechi', lat: 37.498, lon: 127.060 },
+            { name: 'Dogok', lat: 37.490, lon: 127.045 },
+            { name: 'Gaepo', lat: 37.480, lon: 127.065 },
+            { name: 'Ilwon', lat: 37.485, lon: 127.085 },
+            { name: 'Suseo', lat: 37.488, lon: 127.102 },
+            { name: 'Segok', lat: 37.465, lon: 127.105 }
+        ],
+        '1165000000': [ // Seocho-gu
+            { name: 'Jamwon', lat: 37.515, lon: 127.015 },
+            { name: 'Banpo', lat: 37.505, lon: 127.000 },
+            { name: 'Seocho', lat: 37.488, lon: 127.015 },
+            { name: 'Bangbae', lat: 37.482, lon: 126.995 },
+            { name: 'Yangjae', lat: 37.482, lon: 127.038 },
+            { name: 'Umyeon', lat: 37.465, lon: 127.025 },
+            { name: 'Naegok', lat: 37.455, lon: 127.065 }
+        ]
+    };
+
     // Hardcoded coordinates for each region (approximate center)
     // Used to construct the API request
     private getRegionCoords(cortarNo: string) {
@@ -44,34 +86,34 @@ export class NaverLandService {
      * Get Article List using Direct API Fetch (No Puppeteer)
      */
     async getArticleList(cortarNo: string, criteria: SearchCriteria) {
-        logger.info('NaverLandService', 'Fetching Article List (Grid Search)', { cortarNo, criteria });
+        logger.info('NaverLandService', 'Fetching Article List (Dong Search)', { cortarNo, criteria });
 
         try {
-            const { lat: centerLat, lon: centerLon } = this.getRegionCoords(cortarNo);
+            // Determine Search Points
+            // If Region is in Registry, use named Dongs.
+            // If not, use generic 4x4 Grid.
+            let searchPoints: { name: string, lat: number, lon: number }[] = [];
+            const subBoxSize = 0.02; // 2km radius is safe for both Dong and Grid
 
-            // Grid Search Strategy
-            // The API rejects large bounding boxes (e.g. 0.08) from server IPs.
-            // We split the 0.08 radius area into a 4x4 grid of safe 0.02 boxes.
-            // Total width/height covered: 0.16 deg (approx 16km).
-
-            const gridSize = 4;      // 4x4 grid
-            const step = 0.04;       // Distance between sub-centers
-            const subBoxSize = 0.02; // Safe box size (verified 0.01 works, 0.02 likely safe)
-
-            // Start from bottom-left
-            // Center - 0.06 is the first sub-center (since we want +/- 0.08 total)
-            // -0.06, -0.02, +0.02, +0.06 covers the range [-0.08, 0.08] with +/- 0.02 boxes
-            const startOffset = -0.06;
-
-            const gridPoints: { lat: number, lon: number }[] = [];
-
-            for (let i = 0; i < gridSize; i++) {
-                for (let j = 0; j < gridSize; j++) {
-                    gridPoints.push({
-                        lat: centerLat + startOffset + (i * step),
-                        lon: centerLon + startOffset + (j * step)
-                    });
+            if (this.DONG_REGISTRY[cortarNo]) {
+                searchPoints = this.DONG_REGISTRY[cortarNo];
+                logger.info('NaverLandService', `Using ${searchPoints.length} Known Dong Centers`);
+            } else {
+                // Fallback: 4x4 Grid
+                const { lat: centerLat, lon: centerLon } = this.getRegionCoords(cortarNo);
+                const gridSize = 4;
+                const step = 0.04;
+                const startOffset = -0.06;
+                for (let i = 0; i < gridSize; i++) {
+                    for (let j = 0; j < gridSize; j++) {
+                        searchPoints.push({
+                            name: `Grid_${i}_${j}`,
+                            lat: centerLat + startOffset + (i * step),
+                            lon: centerLon + startOffset + (j * step)
+                        });
+                    }
                 }
+                logger.info('NaverLandService', 'Using Generic Grid Search');
             }
 
             const fetchSubRegion = async (point: { lat: number, lon: number }) => {
@@ -93,7 +135,7 @@ export class NaverLandService {
                 params.append('lft', String(lft.toFixed(7)));
                 params.append('top', String(top.toFixed(7)));
                 params.append('rgt', String(rgt.toFixed(7)));
-                params.append('page', '1'); // Fetch 1st page of each grid
+                params.append('page', '1'); // Fetch 1st page of each sub-region
 
                 // Filters
                 if (criteria.priceMax) params.append('prc', `0:${criteria.priceMax}`);
@@ -113,7 +155,7 @@ export class NaverLandService {
                     const json = await response.json();
                     return Array.isArray(json.body) ? json.body : [];
                 } catch (e) {
-                    logger.error('NaverLandService', 'Grid Fetch Error', { error: e });
+                    logger.error('NaverLandService', 'Sub-region Fetch Error', { error: e });
                     return [];
                 }
             };
@@ -121,7 +163,7 @@ export class NaverLandService {
             // Execute in parallel
             // 16 requests might hit rate limits, but usually fine for this specific API.
             // We can batch if needed, but Promise.all is fastest.
-            const results = await Promise.all(gridPoints.map(p => fetchSubRegion(p)));
+            const results = await Promise.all(searchPoints.map(p => fetchSubRegion(p)));
 
             // Aggregate and Deduplicate
             const allItems = results.flat();
@@ -134,8 +176,8 @@ export class NaverLandService {
             });
 
             const uniqueList = Array.from(uniqueMap.values());
-            logger.info('NaverLandService', 'Grid Search Success', {
-                gridPoints: gridPoints.length,
+            logger.info('NaverLandService', 'Search Success', {
+                points: searchPoints.length,
                 totalRaw: allItems.length,
                 unique: uniqueList.length
             });
