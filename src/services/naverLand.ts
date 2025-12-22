@@ -44,41 +44,56 @@ export class NaverLandService {
      * Get Article List using Direct API Fetch (No Puppeteer)
      */
     async getArticleList(cortarNo: string, criteria: SearchCriteria) {
-        logger.info('NaverLandService', 'Fetching Article List API', { cortarNo, criteria });
+        logger.info('NaverLandService', 'Fetching Article List (Grid Search)', { cortarNo, criteria });
 
         try {
-            const { lat, lon } = this.getRegionCoords(cortarNo);
+            const { lat: centerLat, lon: centerLon } = this.getRegionCoords(cortarNo);
 
-            // Construct TIGHTER Bounding Box (Approx +/- 0.02 deg for ~2km radius)
-            // INCREASED to 0.08 (approx 8km) which is safer than 0.12 but covers most of the district
-            const boxSize = 0.08;
-            const btm = lat - boxSize;
-            const top = lat + boxSize;
-            const lft = lon - boxSize;
-            const rgt = lon + boxSize;
+            // Grid Search Strategy
+            // The API rejects large bounding boxes (e.g. 0.08) from server IPs.
+            // We split the 0.08 radius area into a 4x4 grid of safe 0.02 boxes.
+            // Total width/height covered: 0.16 deg (approx 16km).
 
+            const gridSize = 4;      // 4x4 grid
+            const step = 0.04;       // Distance between sub-centers
+            const subBoxSize = 0.02; // Safe box size (verified 0.01 works, 0.02 likely safe)
 
-            // Loop for Pagination (Max 5 pages to avoid overload)
-            let allList: any[] = [];
-            let page = 1;
-            const maxPages = 5;
+            // Start from bottom-left
+            // Center - 0.06 is the first sub-center (since we want +/- 0.08 total)
+            // -0.06, -0.02, +0.02, +0.06 covers the range [-0.08, 0.08] with +/- 0.02 boxes
+            const startOffset = -0.06;
 
-            while (page <= maxPages) {
+            const gridPoints: { lat: number, lon: number }[] = [];
+
+            for (let i = 0; i < gridSize; i++) {
+                for (let j = 0; j < gridSize; j++) {
+                    gridPoints.push({
+                        lat: centerLat + startOffset + (i * step),
+                        lon: centerLon + startOffset + (j * step)
+                    });
+                }
+            }
+
+            const fetchSubRegion = async (point: { lat: number, lon: number }) => {
+                const { lat, lon } = point;
+                const btm = lat - subBoxSize;
+                const top = lat + subBoxSize;
+                const lft = lon - subBoxSize;
+                const rgt = lon + subBoxSize;
+
                 // Prepare Query Params
                 const params = new URLSearchParams();
                 params.append('cortarNo', cortarNo);
                 params.append('rletTpCd', 'APT:ABYG:JGC');
                 params.append('tradTpCd', criteria.tradeType || 'A1');
-                params.append('z', '16'); // Use User's Zoom Level (High accuracy)
+                params.append('z', '16'); // Use User's Zoom Level
                 params.append('lat', String(lat));
                 params.append('lon', String(lon));
                 params.append('btm', String(btm.toFixed(7)));
                 params.append('lft', String(lft.toFixed(7)));
                 params.append('top', String(top.toFixed(7)));
                 params.append('rgt', String(rgt.toFixed(7)));
-
-                // Pagination Param
-                params.append('page', String(page));
+                params.append('page', '1'); // Fetch 1st page of each grid
 
                 // Filters
                 if (criteria.priceMax) params.append('prc', `0:${criteria.priceMax}`);
@@ -87,60 +102,64 @@ export class NaverLandService {
 
                 const apiUrl = `${NAVER_LAND_MOBILE_HOST}/cluster/ajax/articleList?${params.toString()}`;
 
-                const response = await fetch(apiUrl, {
-                    headers: {
-                        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
-                        'Referer': 'https://m.land.naver.com/'
-                    }
-                });
-
-                if (!response.ok) {
-                    logger.warn('NaverLandService', `Page ${page} Failed`, { status: response.status });
-                    break;
+                try {
+                    const response = await fetch(apiUrl, {
+                        headers: {
+                            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
+                            'Referer': 'https://m.land.naver.com/'
+                        }
+                    });
+                    if (!response.ok) return [];
+                    const json = await response.json();
+                    return Array.isArray(json.body) ? json.body : [];
+                } catch (e) {
+                    logger.error('NaverLandService', 'Grid Fetch Error', { error: e });
+                    return [];
                 }
+            };
 
-                const json = await response.json();
-                const list = json.body || [];
+            // Execute in parallel
+            // 16 requests might hit rate limits, but usually fine for this specific API.
+            // We can batch if needed, but Promise.all is fastest.
+            const results = await Promise.all(gridPoints.map(p => fetchSubRegion(p)));
 
-                if (!Array.isArray(list) || list.length === 0) {
-                    break; // No more results
+            // Aggregate and Deduplicate
+            const allItems = results.flat();
+            const uniqueMap = new Map();
+
+            allItems.forEach((item: any) => {
+                if (!uniqueMap.has(item.atclNo)) {
+                    uniqueMap.set(item.atclNo, item);
                 }
+            });
 
-                allList = allList.concat(list);
-
-                // If less than 20 items (default page size), we are done
-                if (list.length < 20) break;
-
-                page++;
-            }
-
-            const list = allList;
-
-            if (list.length === 0) {
-                return [];
-            }
-
-            logger.info('NaverLandService', 'API Success', { count: list.length });
+            const uniqueList = Array.from(uniqueMap.values());
+            logger.info('NaverLandService', 'Grid Search Success', {
+                gridPoints: gridPoints.length,
+                totalRaw: allItems.length,
+                unique: uniqueList.length
+            });
 
             // Map to Property Interface
-            const articles = list.map((item: any) => ({
+            const articles = uniqueList.map((item: any) => ({
                 id: item.atclNo,
-                name: item.atclNm, // e.g. "Olymipc Family Town"
-                price: typeof item.prc === 'number' ? item.prc : parseInt(item.prc), // Validate Number (Man-won)
-                households: 0, // Not available in 'cluster/articleList' API
+                name: item.atclNm,
+                price: typeof item.prc === 'number' ? item.prc : parseInt(item.prc),
+                households: 0,
                 area: {
                     m2: typeof item.spc1 === 'string' ? parseFloat(item.spc1) : item.spc1,
                     pyeong: typeof item.spc1 === 'string' ? Math.round(parseFloat(item.spc1) / 3.3) : Math.round(item.spc1 / 3.3)
                 },
                 link: `https://m.land.naver.com/article/info/${item.atclNo}`,
                 note: undefined,
-                _rawPrice: item.prc // Use "prc" (Man-won number) for filtering
+                _rawPrice: item.prc
             }));
 
-            // Post-processing: No longer needed for price parsing since 'prc' gives number
-            const processed = articles;
+            // Sort by Date or Price (Optional, but good for UI)
+            // Default to most recent (highest ID usually)
+            articles.sort((a, b) => Number(b.id) - Number(a.id));
 
-            return processed;
+            return articles;
 
         } catch (error) {
             logger.error('NaverLandService', 'API Fetch Failed', { error });
