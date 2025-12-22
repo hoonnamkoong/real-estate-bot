@@ -1,3 +1,5 @@
+'use client';
+
 import { Container, Stack, Title, Text, LoadingOverlay, Box, Group, LoadingOverlayProps } from '@mantine/core';
 import { useState, useTransition, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
