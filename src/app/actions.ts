@@ -116,6 +116,35 @@ export async function searchProperties(data: FilterValues): Promise<Property[]> 
 }
 
 export async function updatePropertyNote(id: string, note: string) {
-    // Save note to DB
-    console.log(`Saving note for ${id}: ${note}`);
+    try {
+        // 1. Get the latest SearchSetting
+        // Cast to any to bypass stale TS errors if client isn't updated
+        const latestSetting = await prisma.searchSetting.findFirst({
+            orderBy: { updatedAt: 'desc' }
+        });
+
+        if (!latestSetting || !(latestSetting as any).results) return;
+
+        // 2. Parse results
+        const results = (latestSetting as any).results as Property[];
+
+        // 3. Find and update item
+        const newResults = results.map((item) => {
+            if (item.id === id) {
+                return { ...item, note: note };
+            }
+            return item;
+        });
+
+        // 4. Save back to DB
+        await prisma.searchSetting.update({
+            where: { id: latestSetting.id },
+            data: { results: newResults as any }
+        });
+
+        console.log(`Updated note for ${id} in setting ${latestSetting.id}`);
+
+    } catch (e) {
+        console.error('Failed to update property note', e);
+    }
 }
