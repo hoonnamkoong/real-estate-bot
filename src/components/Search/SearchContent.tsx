@@ -78,9 +78,11 @@ export function SearchContent({ initialData }: SearchContentProps) {
 
     const initialValues = getInitialValues();
 
-    // Auto-Search on Mount
+    // Auto-Search Removed as per user request to prevent instant blocking/rate-limiting.
+    // User must click 'Search' button manually.
+    /* 
     useEffect(() => {
-        if (searched) return; // If we already loaded snapshot, do NOT search again.
+        if (searched) return; 
 
         const hasUrlKeyParams = searchParams.has('regions') || searchParams.has('tradeType');
 
@@ -89,8 +91,8 @@ export function SearchContent({ initialData }: SearchContentProps) {
         } else if (!searched && initialData?.settings) {
             handleSearch(initialValues);
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+    */
 
     const handleNoteChange = async (id: string, note: string) => {
         setProperties(prev => prev.map(p => p.id === id ? { ...p, note: note as any } : p));

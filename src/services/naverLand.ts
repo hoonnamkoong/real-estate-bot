@@ -170,7 +170,7 @@ export class NaverLandService {
                 const rgt = lon + subBoxSize;
 
                 const allSubItems: any[] = [];
-                const maxPages = 3; // Reduced from 5 to avoid Timeout on Vercel
+                const maxPages = 5; // Restore deep search as per user request
 
                 for (let page = 1; page <= maxPages; page++) {
                     const params = new URLSearchParams();
@@ -222,10 +222,15 @@ export class NaverLandService {
                 return allSubItems;
             };
 
-            // Execute in parallel
-            // 16 requests might hit rate limits, but usually fine for this specific API.
-            // We can batch if needed, but Promise.all is fastest.
-            const results = await Promise.all(searchPoints.map(p => fetchSubRegion(p)));
+            // Execute Sequentially with Delay to prevent Blocking
+            // User requested: "Don't get blocked, time doesn't matter".
+            const results: any[] = [];
+            for (const point of searchPoints) {
+                const subResult = await fetchSubRegion(point);
+                results.push(subResult);
+                // 500ms delay between points
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
 
             // Aggregate and Deduplicate
             const allItems = results.flat();
