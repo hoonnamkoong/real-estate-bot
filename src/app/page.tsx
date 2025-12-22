@@ -11,14 +11,16 @@ import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 
 // Extract SearchContent props
 interface SearchContentProps {
-  lastSettings: FilterValues | null;
+  initialData: { settings: FilterValues, results: Property[] } | null;
 }
 
-function SearchContent({ lastSettings }: SearchContentProps) {
-  const [properties, setProperties] = useState<Property[]>([]);
+function SearchContent({ initialData }: SearchContentProps) {
+  // Initialize with snapshot results if available
+  const [properties, setProperties] = useState<Property[]>(initialData?.results || []);
   const [isPending, startTransition] = useTransition();
-  const [searched, setSearched] = useState(false);
-  const [searchTime, setSearchTime] = useState<string | null>(null);
+  // If we have results, consider it 'searched'
+  const [searched, setSearched] = useState(!!initialData?.results && initialData.results.length > 0);
+  const [searchTime, setSearchTime] = useState<string | null>(initialData?.results?.length ? 'Last Snapshot' : null);
 
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -51,8 +53,6 @@ function SearchContent({ lastSettings }: SearchContentProps) {
     if (searchParams.get('areaMin')) fromUrl.areaMin = Number(searchParams.get('areaMin'));
     if (searchParams.get('roomCount')) fromUrl.roomCount = Number(searchParams.get('roomCount'));
 
-    const hasUrlParams = Object.keys(fromUrl).length > 0;
-
     // Default Fallback
     const defaults: FilterValues = {
       regions: ['songpa', 'seocho'],
@@ -62,6 +62,9 @@ function SearchContent({ lastSettings }: SearchContentProps) {
       roomCount: 4,
       minHouseholds: 500
     };
+
+    const lastSettings = initialData?.settings;
+    const hasUrlParams = Object.keys(fromUrl).length > 0;
 
     // Merge: Defaults -> LastSettings (if no URL) -> URL
     const merged: FilterValues = {
@@ -83,16 +86,33 @@ function SearchContent({ lastSettings }: SearchContentProps) {
 
   // Auto-Search on Mount
   useEffect(() => {
-    if (searched) return;
+    if (searched) return; // If we already loaded snapshot, do NOT search again.
 
-    // Check if we should auto-search
-    // 1. URL params exist (Deep Linking)
-    // 2. OR No URL params but we have Last Settings (Global State)
+    // Check if we *should* search (e.g., Deep Link with NO snapshot, or user expects search)
+    // If URL params exist, we usually want to search to update results?
+    // User said: "Shared links... table maintained".
+    // If I open a link ?regions=X, and my DB snapshot is Y, I should show X?
+    // Current logic: If URL params exist, we enter this block.
+    // BUT we added a check above: `if (searched) return`.
+    // Since `searched` is true if `initialData.results` exists, we might skip deep linking search if we just loaded global snapshot.
+    // This is TRICKY.
+    // Case 1: Root Visit -> `initialData` exists -> `searched` is true -> No Fetch. Correct (Snapshot).
+    // Case 2: Deep Link Visit -> `initialData` matches Last Search (maybe unrelated) -> `searched` is true.
+    // If I send you `?regions=A` but the global last search was `B`, you see `B`! This is BAD.
+
+    // Fix: Only use Snapshot if URL params are EMPTY.
+    // If URL Params exist, we MUST ignore snapshot and force search (or check if snapshot matches URL, which is hard).
+    // So:
     const hasUrlKeyParams = searchParams.has('regions') || searchParams.has('tradeType');
-    const shouldUseLast = !hasUrlKeyParams && !!lastSettings;
 
-    if (hasUrlKeyParams || shouldUseLast) {
-      // We use the derived initialValues which already prioritized URL > Last
+    if (hasUrlKeyParams) {
+      // Force Search even if we have snapshot (because snapshot might be stale/different)
+      // Unless snapshot MATCHES the URL parameters? Too complex.
+      // Let's just trigger search for Deep Links.
+      handleSearch(initialValues);
+    } else if (!searched && initialData?.settings) {
+      // No URL, No Snapshot? (searched is false if results empty)
+      // If we have settings but no results (e.g. old DB record), trigger search.
       handleSearch(initialValues);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -140,13 +160,13 @@ function SearchContent({ lastSettings }: SearchContentProps) {
 }
 
 export default async function Home() {
-  const lastSettings = await getLastSearchSetting();
+  const initialData = await getLastSearchSetting();
 
   return (
     <main>
       <Header />
       <Suspense fallback={<Box p="xl"><Text ta="center">Loading Search...</Text></Box>}>
-        <SearchContent lastSettings={lastSettings} />
+        <SearchContent initialData={initialData} />
       </Suspense>
     </main>
   );

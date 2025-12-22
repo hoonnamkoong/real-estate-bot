@@ -15,6 +15,7 @@ model SearchSetting {
   areaMin   Int?
   areaMax   Int?
   roomCount Int?
+  results   Json?
   updatedAt DateTime @updatedAt
 }
 
