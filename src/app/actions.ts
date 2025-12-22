@@ -117,24 +117,42 @@ export async function searchProperties(data: FilterValues): Promise<Property[]> 
 
 export async function updatePropertyNote(id: string, note: string) {
     try {
+        console.log(`[updatePropertyNote] Starting update for ID: ${id}, Note: ${note}`);
+
         // 1. Get the latest SearchSetting
         // Cast to any to bypass stale TS errors if client isn't updated
         const latestSetting = await prisma.searchSetting.findFirst({
             orderBy: { updatedAt: 'desc' }
         });
 
-        if (!latestSetting || !(latestSetting as any).results) return;
+        if (!latestSetting) {
+            console.error('[updatePropertyNote] No SearchSetting found in DB');
+            throw new Error('No SearchSetting found - cannot update note');
+        }
+
+        if (!(latestSetting as any).results) {
+            console.error('[updatePropertyNote] SearchSetting has no results field');
+            // Initialize as empty array if missing
+            (latestSetting as any).results = [];
+        }
 
         // 2. Parse results
         const results = (latestSetting as any).results as Property[];
 
+        let found = false;
+
         // 3. Find and update item
         const newResults = results.map((item) => {
             if (item.id === id) {
+                found = true;
                 return { ...item, note: note };
             }
             return item;
         });
+
+        if (!found) {
+            console.warn(`[updatePropertyNote] Item ID ${id} not found in current snapshot`);
+        }
 
         // 4. Save back to DB
         await prisma.searchSetting.update({
@@ -142,9 +160,11 @@ export async function updatePropertyNote(id: string, note: string) {
             data: { results: newResults as any }
         });
 
-        console.log(`Updated note for ${id} in setting ${latestSetting.id}`);
+        console.log(`[updatePropertyNote] SUCCESS: Updated note for ${id} in setting ${latestSetting.id}`);
+        return true;
 
     } catch (e) {
-        console.error('Failed to update property note', e);
+        console.error('[updatePropertyNote] FAILED to update property note', e);
+        throw e; // Rethrow so frontend/Sentry catches it
     }
 }
