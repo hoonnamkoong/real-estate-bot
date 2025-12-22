@@ -116,7 +116,7 @@ export class NaverLandService {
                 logger.info('NaverLandService', 'Using Generic Grid Search');
             }
 
-            const fetchSubRegion = async (point: { lat: number, lon: number }) => {
+            const fetchSubRegion = async (point: { name: string, lat: number, lon: number }) => {
                 const { lat, lon } = point;
                 const btm = lat - subBoxSize;
                 const top = lat + subBoxSize;
@@ -153,7 +153,8 @@ export class NaverLandService {
                     });
                     if (!response.ok) return [];
                     const json = await response.json();
-                    return Array.isArray(json.body) ? json.body : [];
+                    const items = Array.isArray(json.body) ? json.body : [];
+                    return items.map((item: any) => ({ ...item, _dongName: point.name }));
                 } catch (e) {
                     logger.error('NaverLandService', 'Sub-region Fetch Error', { error: e });
                     return [];
@@ -194,7 +195,8 @@ export class NaverLandService {
                 },
                 link: `https://m.land.naver.com/article/info/${item.atclNo}`,
                 note: undefined,
-                _rawPrice: item.prc
+                _rawPrice: item.prc,
+                dongName: item._dongName
             }));
 
             // Sort by Date or Price (Optional, but good for UI)

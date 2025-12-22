@@ -10,6 +10,7 @@ export interface Property {
     area: { m2: number; pyeong: number };
     link: string; // Naver Real Estate Link
     note?: 'High' | 'Mid' | 'Low';
+    dongName?: string; // e.g. "Jamsil", "Garak"
 }
 
 interface ListingTableProps {
@@ -41,6 +42,9 @@ export function ListingTable({ data, onNoteChange }: ListingTableProps) {
                         <Text>{item.area.m2}m²</Text>
                         <Text c="dimmed" size="sm">({item.area.pyeong}평)</Text>
                     </Group>
+                </Table.Td>
+                <Table.Td>
+                    <Text size="sm">{item.dongName || '-'}</Text>
                 </Table.Td>
                 <Table.Td>
                     <Button component="a" href={item.link} target="_blank" size="xs" variant="light">
@@ -76,6 +80,7 @@ export function ListingTable({ data, onNoteChange }: ListingTableProps) {
                             <Table.Th>매매가</Table.Th>
 
                             <Table.Th>면적</Table.Th>
+                            <Table.Th>동</Table.Th>
                             <Table.Th>링크</Table.Th>
                             <Table.Th>비고</Table.Th>
                         </Table.Tr>
@@ -99,6 +104,7 @@ export function ListingTable({ data, onNoteChange }: ListingTableProps) {
                                 <Text fw={700} size="lg">{item.name}</Text>
                                 <Text c="red" fw={700} size="lg">{priceStr}</Text>
                             </Group>
+                            <Text size="sm" c="dimmed" mb="xs">{item.dongName}</Text>
 
 
                             <Group justify="space-between" mb="sm">
