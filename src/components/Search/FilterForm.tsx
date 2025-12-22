@@ -26,9 +26,9 @@ export function FilterForm({ onSearch, loading, initialValues }: FilterFormProps
         initialValues: {
             regions: ['songpa', 'seocho'],
             tradeType: 'A1',   // Sale
-            priceMax: 20,  // 20 Eok
-            areaMin: 120,   // 120m2
-            roomCount: 4,  // 4 rooms
+            priceMax: 80,
+            areaMin: 59,
+            roomCount: 2,
             minHouseholds: 500,
             ...initialValues
         },
