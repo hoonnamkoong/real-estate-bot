@@ -1,7 +1,5 @@
-'use client';
-
-import { Container, Stack, Title, Text, LoadingOverlay, Box, Group } from '@mantine/core';
-import { useState, useTransition, useEffect } from 'react';
+import { Container, Stack, Title, Text, LoadingOverlay, Box, Group, LoadingOverlayProps } from '@mantine/core';
+import { useState, useTransition, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import dayjs from 'dayjs';
 import { Header } from '@/components/Layout/Header';
@@ -9,7 +7,7 @@ import { FilterForm, FilterValues } from '@/components/Search/FilterForm';
 import { ListingTable, Property } from '@/components/Property/ListingTable';
 import { searchProperties, updatePropertyNote } from './actions';
 
-export default function Home() {
+function SearchContent() {
   const [properties, setProperties] = useState<Property[]>([]);
   const [isPending, startTransition] = useTransition();
   const [searched, setSearched] = useState(false);
@@ -48,10 +46,6 @@ export default function Home() {
   // Auto-Search on Mount if Params exist
   useEffect(() => {
     if (searchParams.toString() && !searched) {
-      // Reconstruct full values with defaults if needed, or rely on form
-      // Actually we need to call handleSearch with *Values*.
-      // Since the form has the merged values, we can't easily retrieve them here unless we duplicate default logic.
-      // Better approach: Let the form initialize, but here we just construct the object.
       const values: FilterValues = {
         regions: initialFilterValues.regions || ['songpa', 'seocho'],
         tradeType: initialFilterValues.tradeType || 'A1',
@@ -66,46 +60,53 @@ export default function Home() {
   }, []); // Run once on mount
 
   const handleNoteChange = async (id: string, note: string) => {
-    // Optimistic Update
     setProperties(prev => prev.map(p => p.id === id ? { ...p, note: note as any } : p));
     await updatePropertyNote(id, note);
   };
 
   return (
+    <Container size="xl" py="xl">
+      <Stack gap="xl">
+        <Box pos="relative">
+          <LoadingOverlay visible={isPending} overlayProps={{ radius: "sm", blur: 2 }} />
+          <FilterForm onSearch={handleSearch} loading={isPending} initialValues={initialFilterValues} />
+        </Box>
+
+        <Box>
+          <Group justify="space-between" mb="md" align="center">
+            <Title order={4}>
+              검색 결과 {searched && `(${properties.length}건)`}
+            </Title>
+            {searchTime && (
+              <Text size="sm" c="dimmed">
+                탐색 시간: {searchTime}
+              </Text>
+            )}
+          </Group>
+
+          {properties.length > 0 ? (
+            <ListingTable data={properties} onNoteChange={handleNoteChange} />
+          ) : (
+            searched && <Text c="dimmed" ta="center" py="xl">조건에 맞는 매물이 없습니다.</Text>
+          )}
+          {!searched && <Text c="dimmed" ta="center" py="xl">검색 조건을 입력하고 검색 버튼을 눌러주세요.</Text>}
+
+          <Text c="dimmed" size="xs" ta="center" mt="xl">
+            Real Estate Bot v1.5 (Telegram Enabled)
+          </Text>
+        </Box>
+      </Stack>
+    </Container>
+  );
+}
+
+export default function Home() {
+  return (
     <main>
       <Header />
-      <Container size="xl" py="xl">
-        <Stack gap="xl">
-          <Box pos="relative">
-            <LoadingOverlay visible={isPending} overlayProps={{ radius: "sm", blur: 2 }} />
-            <FilterForm onSearch={handleSearch} loading={isPending} initialValues={initialFilterValues} />
-          </Box>
-
-          <Box>
-            <Group justify="space-between" mb="md" align="center">
-              <Title order={4}>
-                검색 결과 {searched && `(${properties.length}건)`}
-              </Title>
-              {searchTime && (
-                <Text size="sm" c="dimmed">
-                  탐색 시간: {searchTime}
-                </Text>
-              )}
-            </Group>
-
-            {properties.length > 0 ? (
-              <ListingTable data={properties} onNoteChange={handleNoteChange} />
-            ) : (
-              searched && <Text c="dimmed" ta="center" py="xl">조건에 맞는 매물이 없습니다.</Text>
-            )}
-            {!searched && <Text c="dimmed" ta="center" py="xl">검색 조건을 입력하고 검색 버튼을 눌러주세요.</Text>}
-
-            <Text c="dimmed" size="xs" ta="center" mt="xl">
-              Real Estate Bot v1.5 (Telegram Enabled)
-            </Text>
-          </Box>
-        </Stack>
-      </Container>
+      <Suspense fallback={<Box p="xl"><Text ta="center">Loading Search...</Text></Box>}>
+        <SearchContent />
+      </Suspense>
     </main>
   );
 }
