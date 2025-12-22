@@ -55,6 +55,49 @@ export class NaverLandService {
         ]
     };
 
+    // Map of specific CortarNo (10-digit) to Dong Name
+    private DONG_CODE_MAP: Record<string, string> = {
+        // Songpa-gu (11710)
+        '1171010100': '잠실',
+        '1171010200': '신천',
+        '1171010300': '풍납', // Fixed: Hangang Geukdong is here
+        '1171010400': '송파',
+        '1171010500': '석촌',
+        '1171010600': '삼전',
+        '1171010700': '가락',
+        '1171010800': '문정',
+        '1171010900': '장지',
+        '1171011100': '방이',
+        '1171011200': '오금',
+        '1171011300': '거여',
+        '1171011400': '마천', // Fixed: Macheon Kumho is here
+
+        // Gangnam-gu (11680)
+        '1168010100': '역삼',
+        '1168010300': '개포',
+        '1168010400': '청담',
+        '1168010500': '삼성',
+        '1168010600': '대치',
+        '1168010700': '신사',
+        '1168010800': '논현',
+        '1168011000': '압구정',
+        '1168011100': '세곡',
+        '1168011200': '자곡',
+        '1168011300': '율현',
+        '1168011400': '일원',
+        '1168011500': '수서',
+        '1168011800': '도곡',
+
+        // Seocho-gu (11650)
+        '1165010100': '서초',
+        '1165010200': '양재',
+        '1165010300': '우면',
+        '1165010400': '원지',
+        '1165010600': '잠원',
+        '1165010700': '반포',
+        '1165010800': '방배'
+    };
+
     // Hardcoded coordinates for each region (approximate center)
     // Used to construct the API request
     private getRegionCoords(cortarNo: string) {
@@ -159,7 +202,11 @@ export class NaverLandService {
 
                         if (items.length === 0) break; // Stop if no items
 
-                        allSubItems.push(...items.map((item: any) => ({ ...item, _dongName: point.name })));
+                        allSubItems.push(...items.map((item: any) => ({
+                            ...item,
+                            // Use mapped name from item's cortarNo if available, otherwise fallback to search point name
+                            _dongName: this.DONG_CODE_MAP[item.cortarNo] || point.name
+                        })));
 
                         // Optimization: If fewer than 20 items returned, it's the last page
                         if (items.length < 20) break;
@@ -210,7 +257,7 @@ export class NaverLandService {
                 dongName: item._dongName
             }));
 
-            // Sort by Dong Name then Price (Ascending)
+            // Sort by Dong Name then Price
             articles.sort((a, b) => {
                 const dongA = a.dongName || '';
                 const dongB = b.dongName || '';
@@ -227,6 +274,11 @@ export class NaverLandService {
             return [];
         }
     }
+
+    /**
+     * Get Article Detail (To get households if needed, but expensive)
+     * Skipped for now.
+     */
 
     /**
      * Get Region Code (CortarNo)

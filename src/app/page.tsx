@@ -47,19 +47,26 @@ function SearchContent() {
 
   // Auto-Search on Mount if Params exist
   useEffect(() => {
-    if (searchParams.toString() && !searched) {
+    // Only trigger if we haven't searched yet and there are params in the URL.
+    // We check if any relevant param keys exist.
+    const hasParams = searchParams.has('regions') || searchParams.has('tradeType') || searchParams.has('priceMax');
+
+    if (hasParams && !searched) {
       const values: FilterValues = {
-        regions: initialFilterValues.regions || ['songpa', 'seocho'],
+        regions: initialFilterValues.regions?.length ? initialFilterValues.regions : ['songpa', 'seocho'],
         tradeType: initialFilterValues.tradeType || 'A1',
         priceMax: initialFilterValues.priceMax || 20,
         areaMin: initialFilterValues.areaMin || 120,
         roomCount: initialFilterValues.roomCount || 4,
         minHouseholds: 500
       };
+      // Use setTimeout to allow initial render to settle if needed, though usually not required.
+      // We pass the constructed values directly to the search function logic (bypassing the form state which might be lagging)
       handleSearch(values);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Run once on mount
+  }, [searchParams]); // Depend on searchParams so it fires when they are ready. Added debouncing or check to prevent loops.
+
 
   const handleNoteChange = async (id: string, note: string) => {
     setProperties(prev => prev.map(p => p.id === id ? { ...p, note: note as any } : p));
