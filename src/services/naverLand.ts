@@ -50,8 +50,8 @@ export class NaverLandService {
             const { lat, lon } = this.getRegionCoords(cortarNo);
 
             // Construct TIGHTER Bounding Box (Approx +/- 0.02 deg for ~2km radius)
-            // This reduces the chance of bleeding into neighboring districts (e.g. Gangnam vs Songpa)
-            const boxSize = 0.02;
+            // INCREASED to 0.12 to cover entire district (Songpa is large)
+            const boxSize = 0.12;
             const btm = lat - boxSize;
             const top = lat + boxSize;
             const lft = lon - boxSize;
