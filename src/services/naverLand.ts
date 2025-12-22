@@ -50,8 +50,8 @@ export class NaverLandService {
             const { lat, lon } = this.getRegionCoords(cortarNo);
 
             // Construct TIGHTER Bounding Box (Approx +/- 0.02 deg for ~2km radius)
-            // INCREASED to 0.12 to cover entire district (Songpa is large)
-            const boxSize = 0.12;
+            // INCREASED to 0.08 (approx 8km) which is safer than 0.12 but covers most of the district
+            const boxSize = 0.08;
             const btm = lat - boxSize;
             const top = lat + boxSize;
             const lft = lon - boxSize;
@@ -69,7 +69,7 @@ export class NaverLandService {
                 params.append('cortarNo', cortarNo);
                 params.append('rletTpCd', 'APT:ABYG:JGC');
                 params.append('tradTpCd', criteria.tradeType || 'A1');
-                params.append('z', '14'); // High zoom for accuracy? Or 12?
+                params.append('z', '16'); // Use User's Zoom Level (High accuracy)
                 params.append('lat', String(lat));
                 params.append('lon', String(lon));
                 params.append('btm', String(btm.toFixed(7)));
