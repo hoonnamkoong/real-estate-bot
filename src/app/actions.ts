@@ -51,9 +51,14 @@ export async function searchProperties(data: FilterValues): Promise<Property[]> 
 
     // 4. Client-side Filtering (Refine) because API filters might be limited
     // Example: Filter by Min Households if data available, or Price Max
+    // Ensure accurate type conversion for filtering
     const filtered = results.filter((item: any) => {
         // Filter by Price (item._rawPrice is Man-won, data.priceMax is Eok)
-        if (data.priceMax && item._rawPrice > data.priceMax * 10000) return false;
+        // Ensure inputs are numbers
+        const itemPrice = Number(item._rawPrice);
+        const maxPrice = data.priceMax ? data.priceMax * 10000 : Infinity;
+
+        if (data.priceMax && itemPrice > maxPrice) return false;
 
         // Filter by Area
         if (data.areaMin && item.area.m2 < data.areaMin) return false;

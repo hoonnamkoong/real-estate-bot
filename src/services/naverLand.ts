@@ -170,7 +170,7 @@ export class NaverLandService {
                 const rgt = lon + subBoxSize;
 
                 const allSubItems: any[] = [];
-                const maxPages = 5;
+                const maxPages = 3; // Reduced from 5 to avoid Timeout on Vercel
 
                 for (let page = 1; page <= maxPages; page++) {
                     const params = new URLSearchParams();
