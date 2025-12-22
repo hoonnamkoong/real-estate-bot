@@ -18,7 +18,10 @@ export class NaverLandService {
         '1171000000': [ // Songpa-gu
             { name: '잠실', lat: 37.512, lon: 127.094 },
             { name: '신천', lat: 37.520, lon: 127.105 },
-            { name: '풍납', lat: 37.535, lon: 127.115 },
+            // Pungnap - Split into North/South to cover elongated shape
+            { name: '풍납1', lat: 37.538, lon: 127.123 }, // Near City Geukdong/Pungnap Toseong
+            { name: '풍납2', lat: 37.529, lon: 127.117 }, // Near Pungnap Baekje/Riverville
+            { name: '풍납3', lat: 37.522, lon: 127.110 }, // Near Asan Hospital/Pungnap 2-dong
             { name: '송파', lat: 37.505, lon: 127.115 },
             { name: '석촌', lat: 37.503, lon: 127.105 },
             { name: '삼전', lat: 37.502, lon: 127.090 },

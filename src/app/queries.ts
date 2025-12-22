@@ -15,9 +15,9 @@ export async function getLastSearchSetting(): Promise<{ settings: FilterValues, 
             settings: {
                 regions: last.regions ? last.regions.split(',') : [],
                 tradeType: last.type as any,
-                priceMax: last.priceMax ?? 80, // Relaxed
-                areaMin: last.areaMin ?? 59, // Relaxed (18py)
-                roomCount: last.roomCount ?? 2, // Relaxed
+                priceMax: last.priceMax ?? 20,
+                areaMin: last.areaMin ?? 120,
+                roomCount: last.roomCount ?? 4,
                 minHouseholds: 500
             },
             results: (last.results as Property[]) || []

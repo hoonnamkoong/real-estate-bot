@@ -56,9 +56,9 @@ export function SearchContent({ initialData }: SearchContentProps) {
         const defaults: FilterValues = {
             regions: ['songpa', 'seocho'],
             tradeType: 'A1',
-            priceMax: 80, // Relaxed
-            areaMin: 59, // Relaxed
-            roomCount: 2, // Relaxed
+            priceMax: 20,
+            areaMin: 120,
+            roomCount: 4,
             minHouseholds: 500
         };
 
