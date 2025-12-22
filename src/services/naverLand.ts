@@ -123,42 +123,53 @@ export class NaverLandService {
                 const lft = lon - subBoxSize;
                 const rgt = lon + subBoxSize;
 
-                // Prepare Query Params
-                const params = new URLSearchParams();
-                params.append('cortarNo', cortarNo);
-                params.append('rletTpCd', 'APT:ABYG:JGC');
-                params.append('tradTpCd', criteria.tradeType || 'A1');
-                params.append('z', '16'); // Use User's Zoom Level
-                params.append('lat', String(lat));
-                params.append('lon', String(lon));
-                params.append('btm', String(btm.toFixed(7)));
-                params.append('lft', String(lft.toFixed(7)));
-                params.append('top', String(top.toFixed(7)));
-                params.append('rgt', String(rgt.toFixed(7)));
-                params.append('page', '1'); // Fetch 1st page of each sub-region
+                const allSubItems: any[] = [];
+                const maxPages = 5;
 
-                // Filters
-                if (criteria.priceMax) params.append('prc', `0:${criteria.priceMax}`);
-                if (criteria.areaMin) params.append('spcMin', String(criteria.areaMin));
-                if (criteria.roomCount) params.append('rom', String(criteria.roomCount));
+                for (let page = 1; page <= maxPages; page++) {
+                    const params = new URLSearchParams();
+                    params.append('cortarNo', cortarNo);
+                    params.append('rletTpCd', 'APT:ABYG:JGC');
+                    params.append('tradTpCd', criteria.tradeType || 'A1');
+                    params.append('z', '16');
+                    params.append('lat', String(lat));
+                    params.append('lon', String(lon));
+                    params.append('btm', String(btm.toFixed(7)));
+                    params.append('lft', String(lft.toFixed(7)));
+                    params.append('top', String(top.toFixed(7)));
+                    params.append('rgt', String(rgt.toFixed(7)));
+                    params.append('page', String(page));
 
-                const apiUrl = `${NAVER_LAND_MOBILE_HOST}/cluster/ajax/articleList?${params.toString()}`;
+                    if (criteria.priceMax) params.append('prc', `0:${criteria.priceMax}`);
+                    if (criteria.areaMin) params.append('spcMin', String(criteria.areaMin));
+                    if (criteria.roomCount) params.append('rom', String(criteria.roomCount));
 
-                try {
-                    const response = await fetch(apiUrl, {
-                        headers: {
-                            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
-                            'Referer': 'https://m.land.naver.com/'
-                        }
-                    });
-                    if (!response.ok) return [];
-                    const json = await response.json();
-                    const items = Array.isArray(json.body) ? json.body : [];
-                    return items.map((item: any) => ({ ...item, _dongName: point.name }));
-                } catch (e) {
-                    logger.error('NaverLandService', 'Sub-region Fetch Error', { error: e });
-                    return [];
+                    const apiUrl = `${NAVER_LAND_MOBILE_HOST}/cluster/ajax/articleList?${params.toString()}`;
+
+                    try {
+                        const response = await fetch(apiUrl, {
+                            headers: {
+                                'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
+                                'Referer': 'https://m.land.naver.com/'
+                            }
+                        });
+                        if (!response.ok) break;
+                        const json = await response.json();
+                        const items = Array.isArray(json.body) ? json.body : [];
+
+                        if (items.length === 0) break; // Stop if no items
+
+                        allSubItems.push(...items.map((item: any) => ({ ...item, _dongName: point.name })));
+
+                        // Optimization: If fewer than 20 items returned, it's the last page
+                        if (items.length < 20) break;
+
+                    } catch (e) {
+                        logger.error('NaverLandService', `Sub-region Fetch Error (Page ${page})`, { error: e });
+                        break;
+                    }
                 }
+                return allSubItems;
             };
 
             // Execute in parallel
