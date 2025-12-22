@@ -57,50 +57,66 @@ export class NaverLandService {
             const lft = lon - boxSize;
             const rgt = lon + boxSize;
 
-            // Prepare Query Params
-            const params = new URLSearchParams();
-            params.append('cortarNo', cortarNo); // CRITICAL: Filter by Region Code
-            params.append('rletTpCd', 'APT:ABYG:JGC'); // Apartment, Presale, Reconstruction
-            params.append('tradTpCd', criteria.tradeType || 'A1'); // A1: Sale
-            params.append('z', '14');
-            params.append('lat', String(lat));
-            params.append('lon', String(lon));
-            params.append('btm', String(btm.toFixed(7)));
-            params.append('lft', String(lft.toFixed(7)));
-            params.append('top', String(top.toFixed(7)));
-            params.append('rgt', String(rgt.toFixed(7)));
 
-            // Filter by Price/Area directly in API params
-            // Naver API uses 'prc' in format 'min:max' e.g. '0:50000' (Man-won)
-            if (criteria.priceMax) {
-                params.append('prc', `0:${criteria.priceMax}`);
-            }
-            if (criteria.areaMin) {
-                params.append('spcMin', String(criteria.areaMin));
-            }
-            if (criteria.roomCount) {
-                params.append('rom', String(criteria.roomCount));
-            }
+            // Loop for Pagination (Max 5 pages to avoid overload)
+            let allList: any[] = [];
+            let page = 1;
+            const maxPages = 5;
 
-            const apiUrl = `${NAVER_LAND_MOBILE_HOST}/cluster/ajax/articleList?${params.toString()}`;
-            logger.info('NaverLandService', 'API URL', { url: apiUrl });
+            while (page <= maxPages) {
+                // Prepare Query Params
+                const params = new URLSearchParams();
+                params.append('cortarNo', cortarNo);
+                params.append('rletTpCd', 'APT:ABYG:JGC');
+                params.append('tradTpCd', criteria.tradeType || 'A1');
+                params.append('z', '14'); // High zoom for accuracy? Or 12?
+                params.append('lat', String(lat));
+                params.append('lon', String(lon));
+                params.append('btm', String(btm.toFixed(7)));
+                params.append('lft', String(lft.toFixed(7)));
+                params.append('top', String(top.toFixed(7)));
+                params.append('rgt', String(rgt.toFixed(7)));
 
-            const response = await fetch(apiUrl, {
-                headers: {
-                    'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
-                    'Referer': 'https://m.land.naver.com/'
+                // Pagination Param
+                params.append('page', String(page));
+
+                // Filters
+                if (criteria.priceMax) params.append('prc', `0:${criteria.priceMax}`);
+                if (criteria.areaMin) params.append('spcMin', String(criteria.areaMin));
+                if (criteria.roomCount) params.append('rom', String(criteria.roomCount));
+
+                const apiUrl = `${NAVER_LAND_MOBILE_HOST}/cluster/ajax/articleList?${params.toString()}`;
+
+                const response = await fetch(apiUrl, {
+                    headers: {
+                        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
+                        'Referer': 'https://m.land.naver.com/'
+                    }
+                });
+
+                if (!response.ok) {
+                    logger.warn('NaverLandService', `Page ${page} Failed`, { status: response.status });
+                    break;
                 }
-            });
 
-            if (!response.ok) {
-                throw new Error(`Naver API Response: ${response.status} ${response.statusText}`);
+                const json = await response.json();
+                const list = json.body || [];
+
+                if (!Array.isArray(list) || list.length === 0) {
+                    break; // No more results
+                }
+
+                allList = allList.concat(list);
+
+                // If less than 20 items (default page size), we are done
+                if (list.length < 20) break;
+
+                page++;
             }
 
-            const json = await response.json();
-            const list = json.body || [];
+            const list = allList;
 
-            if (!Array.isArray(list)) {
-                logger.warn('NaverLandService', 'API returned non-array body', { json });
+            if (list.length === 0) {
                 return [];
             }
 
