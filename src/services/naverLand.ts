@@ -294,9 +294,8 @@ export class NaverLandService {
             if (this.DONG_REGISTRY[cortarNo]) {
                 searchPoints = this.DONG_REGISTRY[cortarNo];
                 if (isInteractive) {
-                    // For heavy regions like Songpa/Gangnam, 1 point is the absolute maximum for < 10s
                     searchPoints = searchPoints.slice(0, 1);
-                    logger.info('NaverLandService', `DRACONIAN INTERACTIVE LIMIT: Taking top 1 point (of ${this.DONG_REGISTRY[cortarNo].length})`);
+                    logger.info('NaverLandService', `FORCED 1 POINT for Vercel Hobby 10s limit`);
                 } else {
                     logger.info('NaverLandService', `Using ${searchPoints.length} Known Dong Centers`);
                 }
@@ -326,7 +325,7 @@ export class NaverLandService {
                 const rgt = lon + subBoxSize;
 
                 const allSubItems: any[] = [];
-                const maxPages = isInteractive ? 2 : 5; // Limit to 2 pages for interactive to prevent timeouts
+                const maxPages = 1; // Critical: Limit to 1 page for Vercel Hobby
 
                 for (let page = 1; page <= maxPages; page++) {
                     const params = new URLSearchParams();
