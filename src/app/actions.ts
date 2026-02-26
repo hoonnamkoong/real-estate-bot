@@ -217,12 +217,15 @@ export async function searchPropertiesChunk(data: FilterValues, regionCode: stri
 
         const results = await naverLand.getArticleListByChunk(regionCode, criteria, startIndex, endIndex);
 
-        // Refine filtering
-        const filtered = results.filter((item: any) => {
-            const itemPrice = Number(item._rawPrice);
+        // Refine filtering using mapped propery fields
+        const filtered = results.filter((item: Property) => {
+            const itemPrice = (item as any)._rawPrice;
             const maxPrice = data.priceMax ? data.priceMax * 10000 : Infinity;
+
+            // Critical Fix: Use area.m2 which is mapped in getArticleListByChunk
             if (data.priceMax && itemPrice > maxPrice) return false;
             if (data.areaMin && item.area.m2 < data.areaMin) return false;
+
             return true;
         });
 

@@ -17,6 +17,7 @@
     "@tabler/icons-react": "^3.36.0",
     "dayjs": "^1.11.19",
     "next": "16.1.0",
+    "playwright": "^1.58.2",
     "puppeteer": "^24.34.0",
     "react": "19.2.3",
     "react-dom": "19.2.3"
