@@ -378,21 +378,43 @@ export class NaverLandService {
             const startTime = Date.now();
             const MAX_MS = 7500; // Allow more time for individual point fetches
 
-            console.log(`[NaverLandService] Fetching ${searchPoints.length} points in parallel...`);
+            console.log(`[NaverLandService] Fetching ${searchPoints.length} points with concurrency limit (Batch size: 4)...`);
 
-            const resultsArrays = await Promise.all(
-                searchPoints.map(async (point, idx) => {
-                    const elapsed = Date.now() - startTime;
-                    try {
-                        const pStart = Date.now();
-                        const list = await fetchSubRegion(point);
-                        console.log(`[NaverLandService] DONE: Point #${idx} (${point.name}) in ${Date.now() - pStart}ms, items=${list.length}`);
-                        return list;
-                    } catch (e) {
-                        return [];
-                    }
-                })
-            );
+            const resultsArrays: any[][] = [];
+            const CONCURRENCY = 4;
+
+            for (let i = 0; i < searchPoints.length; i += CONCURRENCY) {
+                const batch = searchPoints.slice(i, i + CONCURRENCY);
+                const batchStart = Date.now();
+
+                const batchResults = await Promise.all(
+                    batch.map(async (point, localIdx) => {
+                        const idx = i + localIdx;
+                        const elapsed = Date.now() - startTime;
+
+                        if (isInteractive && (elapsed > MAX_MS)) {
+                            console.warn(`[NaverLandService] SKIP: Point #${idx} (${point.name}) at ${elapsed}ms due to limit`);
+                            return [];
+                        }
+
+                        try {
+                            const pStart = Date.now();
+                            const list = await fetchSubRegion(point);
+                            console.log(`[NaverLandService] DONE: Point #${idx} (${point.name}) in ${Date.now() - pStart}ms, items=${list.length}`);
+                            return list;
+                        } catch (e) {
+                            return [];
+                        }
+                    })
+                );
+                resultsArrays.push(...batchResults);
+
+                // If we've already exceeded our target time and are interactive, break early
+                if (isInteractive && (Date.now() - startTime >= MAX_MS)) {
+                    console.log(`[NaverLandService] Breaking out of batch loop early to respect interactive timeout.`);
+                    break;
+                }
+            }
 
             const results = resultsArrays.flat();
 

@@ -88,14 +88,16 @@ export async function searchProperties(data: FilterValues): Promise<Property[]> 
 
         const rawCount = results.length;
         const filtered = results.filter((item: any) => {
-            if (!item || !item.area) return false;
+            if (!item) return false;
+            if (item.id === 'TIMEOUT_ERR') return true; // Let timeout error show up
+
+            if (!item.area) return false;
 
             const itemPrice = Number(item._rawPrice || item.price);
             const maxPrice = data.priceMax ? data.priceMax * 10000 : Infinity;
 
             if (data.priceMax && itemPrice > maxPrice) return false;
             if (data.areaMin && item.area.m2 < data.areaMin) return false;
-            // Room count filter is handled via Naver's raw result generally, but good to have if we relaxed API
             return true;
         });
 
