@@ -43,20 +43,41 @@ export async function searchProperties(data: FilterValues): Promise<Property[]> 
             roomCount: data.roomCount || undefined,
         };
 
-        // 3. Parallel Search is handled internally by naverLand.getArticleList
+        // 3. Parallel Search across points to beat 10s timeout
         const fetchStart = Date.now();
-        const resultsArrays = await Promise.all(cortarNos.map(code =>
-            naverLand.getArticleList(code, criteria, true)
-        ));
 
-        let results = resultsArrays.flat();
+        // Timeout promise: Return empty (or error info) after 8.5 seconds
+        const timeoutPromise = new Promise<Property[]>((_, reject) =>
+            setTimeout(() => reject(new Error('네이버 검색 서버 응답 지연 (8.5초 초과)')), 8500)
+        );
 
-        // Remove duplicates safely using atclNo or id
+        const searchPromise = (async () => {
+            const resultsArrays = await Promise.all(cortarNos.map(code =>
+                naverLand.getArticleList(code, criteria, true)
+            ));
+            return resultsArrays.flat();
+        })();
+
+        let results: Property[] = [];
+        try {
+            results = await Promise.race([searchPromise, timeoutPromise]);
+        } catch (e: any) {
+            console.warn(`[searchProperties] Timeout or Error: ${e.message}`);
+            // Return a special debug item so we know it timed out
+            results = [{
+                id: 'TIMEOUT_ERR',
+                name: `[서버 지연] 검색 시간이 너무 오래 걸려 중단되었습니다 (${e.message})`,
+                price: 0,
+                area: { m2: 0, pyeong: 0 },
+                link: '#',
+                dongName: '시스템',
+                note: 'High'
+            } as any];
+        }
+
+        // Remove duplicates safely
         const uniqueItems = Array.from(new Map(results.map(item => [((item as any).atclNo || item.id), item])).values());
         results = uniqueItems;
-
-        console.log(`[searchProperties] Finished with ${results.length} articles`);
-        console.log(`[searchProperties] Total fetch completed in ${Date.now() - fetchStart}ms`);
 
         // Special handling for Client-side chunking:
         // If results are incomplete or if it's a "heavy" region, we might want to tell the client to do more.
