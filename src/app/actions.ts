@@ -62,21 +62,10 @@ export async function searchProperties(data: FilterValues): Promise<Property[]> 
         // If results are incomplete or if it's a "heavy" region, we might want to tell the client to do more.
         // For now, we return what we found within the 5.5s limit.
 
-        // 4. Client-side Filtering (Refine)
-        const filtered = results.filter((item: any) => {
-            if (!item || !item.area) return false;
+        // 4. Client-side Filtering (DISABLED FOR DEBUGGING TO SEE ALL RAW RESULTS)
+        console.log(`[searchProperties] BEFORE_FILTER=${results.length}, FILTER_CRITERIA=${JSON.stringify(data)}`);
 
-            const itemPrice = Number(item._rawPrice || item.price);
-            const maxPrice = data.priceMax ? data.priceMax * 10000 : Infinity;
-
-            // Log for debugging (will only show in server logs, not client)
-            // console.log(`[Filter] ${item.name}: ${itemPrice} vs ${maxPrice}`);
-
-            if (data.priceMax && itemPrice > maxPrice) return false;
-            if (data.areaMin && item.area.m2 < data.areaMin) return false;
-
-            return true;
-        });
+        const filtered = results; // No filtering temporarily to see what Naver returns
 
         // 5. Send Telegram Notification (Async)
         (async () => {
