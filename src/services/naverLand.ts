@@ -281,6 +281,62 @@ export class NaverLandService {
     }
 
     /**
+     * Generate direct Naver API URLs for the Android Proxy App
+     */
+    generateProxyUrls(cortarNos: string[], criteria: SearchCriteria): string[] {
+        const urls: string[] = [];
+        const subBoxSize = 0.04;
+
+        for (const cortarNo of cortarNos) {
+            let searchPoints: { name: string, lat: number, lon: number }[] = [];
+
+            if (this.DONG_REGISTRY[cortarNo]) {
+                searchPoints = this.DONG_REGISTRY[cortarNo];
+            } else {
+                const { lat: centerLat, lon: centerLon } = this.getRegionCoords(cortarNo);
+                const step = 0.04;
+                const startOffset = -0.06;
+                for (let i = 0; i < 4; i++) {
+                    for (let j = 0; j < 4; j++) {
+                        searchPoints.push({
+                            name: `Grid_${i}_${j}`,
+                            lat: centerLat + startOffset + (i * step),
+                            lon: centerLon + startOffset + (j * step)
+                        });
+                    }
+                }
+            }
+
+            for (const point of searchPoints) {
+                const { lat, lon } = point;
+                const btm = lat - subBoxSize;
+                const top = lat + subBoxSize;
+                const lft = lon - subBoxSize;
+                const rgt = lon + subBoxSize;
+
+                const params = new URLSearchParams();
+                params.append('cortarNo', cortarNo);
+                params.append('rletTpCd', 'APT:ABYG:JGC');
+                params.append('tradTpCd', criteria.tradeType || 'A1');
+                params.append('z', '15');
+                params.append('lat', String(lat));
+                params.append('lon', String(lon));
+                params.append('btm', String(btm.toFixed(7)));
+                params.append('lft', String(lft.toFixed(7)));
+                params.append('top', String(top.toFixed(7)));
+                params.append('rgt', String(rgt.toFixed(7)));
+                params.append('page', '1');
+
+                if (criteria.priceMax) params.append('prc', `0:${criteria.priceMax}`);
+
+                const apiUrl = `${NAVER_LAND_MOBILE_HOST}/cluster/ajax/articleList?${params.toString()}`;
+                urls.push(apiUrl);
+            }
+        }
+        return urls;
+    }
+
+    /**
      * Get Article List using Direct API Fetch (No Puppeteer)
      */
     async getArticleList(cortarNo: string, criteria: SearchCriteria, isInteractive: boolean = false) {
@@ -423,60 +479,61 @@ export class NaverLandService {
 
             const results = resultsArrays.flat();
 
-            // Aggregate and Deduplicate
             const allItems = results.flat();
-            const uniqueMap = new Map();
-
-            allItems.forEach((item: any) => {
-                if (!uniqueMap.has(item.atclNo)) {
-                    uniqueMap.set(item.atclNo, item);
-                }
-            });
-
-            const uniqueList = Array.from(uniqueMap.values());
-            logger.info('NaverLandService', 'Search Success', {
-                points: searchPoints.length,
-                totalRaw: allItems.length,
-                unique: uniqueList.length
-            });
-
-            // Map to Property Interface
-            const articles = uniqueList.map((item: any) => {
-                const spc1 = typeof item.spc1 === 'string' ? parseFloat(item.spc1) : (Number(item.spc1) || 0);
-                const price = typeof item.prc === 'number' ? item.prc : (parseInt(item.prc) || 0);
-
-                return {
-                    id: String(item.atclNo || Math.random().toString(36).substr(2, 9)),
-                    name: item.atclNm || 'Unknown Property',
-                    price: price,
-                    households: 0,
-                    area: {
-                        m2: spc1,
-                        pyeong: spc1 > 0 ? Math.round(spc1 / 3.3058) : 0
-                    },
-                    link: item.atclNo ? `https://m.land.naver.com/article/info/${item.atclNo}` : '#',
-                    note: undefined,
-                    _rawPrice: price,
-                    dongName: item._dongName || '-'
-                };
-            });
-
-            // Sort by Dong Name then Price
-            articles.sort((a, b) => {
-                const dongA = a.dongName || '';
-                const dongB = b.dongName || '';
-                if (dongA !== dongB) {
-                    return dongA.localeCompare(dongB);
-                }
-                return a.price - b.price;
-            });
-
-            return articles;
+            return this.mapNaverItemsToProperties(allItems);
 
         } catch (error) {
             logger.error('NaverLandService', 'API Fetch Failed', { error });
             return [];
         }
+    }
+
+    /**
+     * Parse raw Naver items (from Android Proxy) into Property array
+     */
+    mapNaverItemsToProperties(allItems: any[]): Property[] {
+        const uniqueMap = new Map();
+
+        allItems.forEach((item: any) => {
+            if (!uniqueMap.has(item.atclNo)) {
+                // Keep track of dongName if injected by proxy, else use DONG_CODE_MAP
+                const dongName = item._dongName || this.DONG_CODE_MAP[item.cortarNo] || '-';
+                uniqueMap.set(item.atclNo, { ...item, _dongName: dongName });
+            }
+        });
+
+        const uniqueList = Array.from(uniqueMap.values());
+
+        const articles = uniqueList.map((item: any) => {
+            const spc1 = typeof item.spc1 === 'string' ? parseFloat(item.spc1) : (Number(item.spc1) || 0);
+            const price = typeof item.prc === 'number' ? item.prc : (parseInt(item.prc) || 0);
+
+            return {
+                id: String(item.atclNo || Math.random().toString(36).substr(2, 9)),
+                name: item.atclNm || 'Unknown Property',
+                price: price,
+                households: 0,
+                area: {
+                    m2: spc1,
+                    pyeong: spc1 > 0 ? Math.round(spc1 / 3.3058) : 0
+                },
+                link: item.atclNo ? `https://m.land.naver.com/article/info/${item.atclNo}` : '#',
+                note: undefined,
+                _rawPrice: price,
+                dongName: item._dongName || '-'
+            };
+        });
+
+        articles.sort((a, b) => {
+            const dongA = a.dongName || '';
+            const dongB = b.dongName || '';
+            if (dongA !== dongB) {
+                return dongA.localeCompare(dongB);
+            }
+            return a.price - b.price;
+        });
+
+        return articles;
     }
 
     /**
