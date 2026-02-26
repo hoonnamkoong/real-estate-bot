@@ -201,46 +201,13 @@ export async function updatePropertyNote(id: string, note: string) {
 }
 
 /**
- * Chunked Search for Heavy Regions
- */
-export async function searchPropertiesChunk(data: FilterValues, regionCode: string, startIndex: number, endIndex: number): Promise<Property[]> {
-    try {
-        console.log(`[searchPropertiesChunk] Chunk ${startIndex}-${endIndex} for ${regionCode}`);
-
-        const priceMaxManWon = (data.priceMax || 0) * 10000;
-        const criteria: SearchCriteria = {
-            tradeType: data.tradeType as any,
-            priceMax: priceMaxManWon > 0 ? priceMaxManWon : undefined,
-            areaMin: data.areaMin || undefined,
-            roomCount: data.roomCount || undefined,
-        };
-
-        const results = await naverLand.getArticleListByChunk(regionCode, criteria, startIndex, endIndex);
-
-        // Refine filtering using mapped propery fields
-        const filtered = results.filter((item: Property) => {
-            const itemPrice = (item as any)._rawPrice;
-            const maxPrice = data.priceMax ? data.priceMax * 10000 : Infinity;
-
-            // Critical Fix: Use area.m2 which is mapped in getArticleListByChunk
-            if (data.priceMax && itemPrice > maxPrice) return false;
-            if (data.areaMin && item.area.m2 < data.areaMin) return false;
-
-            return true;
-        });
-
-        return filtered;
-    } catch (e) {
-        console.error('[searchPropertiesChunk] Error', e);
-        return [];
-    }
-}
-
-/**
- * Get Point Count for a Region (to help client chunking)
+ * Get Point Count for a Region (DEPRECATED - Returning 1 to disable client chunks)
  */
 export async function getRegionPointCount(region: string): Promise<{ code: string; count: number }> {
     const code = await naverLand.getRegionCode(region);
-    const count = naverLand.getPointCount(code);
-    return { code, count };
+    return { code, count: 1 };
+}
+
+export async function searchPropertiesChunk(data: FilterValues, regionCode: string, startIndex: number, endIndex: number): Promise<Property[]> {
+    return searchProperties({ ...data, regions: ['songpa'] });
 }
