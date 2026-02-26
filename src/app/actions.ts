@@ -7,70 +7,12 @@ import { FilterValues } from '@/components/Search/FilterForm';
 import { Property } from '@/components/Property/ListingTable';
 
 export async function searchProperties(data: FilterValues): Promise<Property[]> {
-    // 1. Save Settings to DB (Async, don't block)
     try {
-        await prisma.searchSetting.create({
-            data: {
-                regions: data.regions ? data.regions.join(',') : '',
-                type: data.tradeType,
-                priceMax: data.priceMax || null,
-                areaMin: data.areaMin || null,
-                areaMax: null,
-                roomCount: data.roomCount || null,
-            } as any
-        });
-    } catch (e) {
-        console.error('Failed to save settings', e);
-    }
+        console.log(`[searchProperties] Starting search for: ${JSON.stringify(data)}`);
 
-    // 2. Resolve Regions (Support Multiple)
-    const regions = data.regions || [];
-    if (regions.length === 0) return [];
-
-    const cortarNos = await Promise.all(regions.map(r => naverLand.getRegionCode(r)));
-
-    // 3. Fetch from Naver (Parallel)
-    // Input priceMax is in Eok (e.g. 30), Naver uses Man-won (e.g. 300000) ?? 
-    // Wait, Naver API usually takes Man-won or specific ranges.
-    // Actually, let's verify if Naver supports price filtering in API directly.
-    // If not, we filter client side. But assuming we pass it or filter later:
-    const priceMaxManWon = data.priceMax * 10000;
-
-    const criteria: SearchCriteria = {
-        tradeType: data.tradeType as any,
-        priceMax: priceMaxManWon,
-        areaMin: data.areaMin,
-        roomCount: data.roomCount,
-    };
-
-    const resultsArrays = await Promise.all(
-        cortarNos.map(code => naverLand.getArticleList(code, criteria))
-    );
-
-    const results = resultsArrays.flat();
-
-    // 4. Client-side Filtering (Refine) because API filters might be limited
-    // Example: Filter by Min Households if data available, or Price Max
-    // Ensure accurate type conversion for filtering
-    const filtered = results.filter((item: any) => {
-        // Filter by Price (item._rawPrice is Man-won, data.priceMax is Eok)
-        // Ensure inputs are numbers
-        const itemPrice = Number(item._rawPrice);
-        const maxPrice = data.priceMax ? data.priceMax * 10000 : Infinity;
-
-        if (data.priceMax && itemPrice > maxPrice) return false;
-
-        // Filter by Area
-        if (data.areaMin && item.area.m2 < data.areaMin) return false;
-
-        return true;
-    });
-
-    // 5. Send Telegram Notification (Async)
-    (async () => {
+        // 1. Save Settings to DB (Async, don't block)
         try {
-            // Updated: Save results to DB
-            const savedSettings = await prisma.searchSetting.create({
+            await prisma.searchSetting.create({
                 data: {
                     regions: data.regions ? data.regions.join(',') : '',
                     type: data.tradeType,
@@ -78,41 +20,130 @@ export async function searchProperties(data: FilterValues): Promise<Property[]> 
                     areaMin: data.areaMin || null,
                     areaMax: null,
                     roomCount: data.roomCount || null,
-                    results: filtered as any // Save the results snapshot
                 } as any
             });
-            console.log(`Saved search results snapshot with ID: ${savedSettings.id}`);
-
-            if (filtered.length === 0) {
-                await telegram.sendMessage(`[부동산 봇] 검색 결과 없음\n조건: ${data.regions.join(',')} ${data.priceMax ? `~${data.priceMax}억` : ''}`);
-                return;
-            }
-
-            const header = `[부동산 봇] 검색 결과 (${filtered.length}건)\n조건: ${data.regions.join(',')} ${data.priceMax}억 이하\n\n`;
-            let message = header;
-            const messages = [];
-
-            for (const item of filtered) {
-                // Name | Price | Link
-                const line = `▪ ${item.name} (${item.price}만원)\n🔗 ${item.link}\n\n`;
-                if (message.length + line.length > 2000) {
-                    messages.push(message);
-                    message = `(이어서)\n\n${line}`;
-                } else {
-                    message += line;
-                }
-            }
-            messages.push(message);
-
-            for (const msg of messages) {
-                await telegram.sendMessage(msg);
-            }
         } catch (e) {
-            console.error('Failed to send telegram or save results', e);
+            console.error('Failed to save settings', e);
         }
-    })();
 
-    return filtered;
+        // 2. Resolve Regions (Support Multiple)
+        const regions = data.regions || [];
+        if (regions.length === 0) return [];
+
+        console.log(`[searchProperties] Resolving region codes for: ${regions}`);
+        const cortarNos = await Promise.all(regions.map(r => naverLand.getRegionCode(r)));
+        console.log(`[searchProperties] Resolved codes: ${cortarNos}`);
+
+        // 3. Fetch from Naver (Parallel)
+        const priceMaxManWon = (data.priceMax || 0) * 10000;
+        const criteria: SearchCriteria = {
+            tradeType: data.tradeType as any,
+            priceMax: priceMaxManWon > 0 ? priceMaxManWon : undefined,
+            areaMin: data.areaMin || undefined,
+            roomCount: data.roomCount || undefined,
+        };
+
+        const fetchStart = Date.now();
+        const resultsArrays = await Promise.all(
+            cortarNos.map(async (code) => {
+                const subStart = Date.now();
+                const list = await naverLand.getArticleList(code, criteria, true);
+                console.log(`[searchProperties] Code ${code} fetch duration: ${Date.now() - subStart}ms, count=${list.length}`);
+                return list;
+            })
+        );
+
+        const results = resultsArrays.flat();
+        console.log(`[searchProperties] Total fetch completed in ${Date.now() - fetchStart}ms, total articles: ${results.length}`);
+
+        // Special handling for Client-side chunking:
+        // If results are incomplete or if it's a "heavy" region, we might want to tell the client to do more.
+        // For now, we return what we found within the 5.5s limit.
+
+        // 4. Client-side Filtering (Refine)
+        const filtered = results.filter((item: any) => {
+            if (!item || !item.area) return false;
+
+            const itemPrice = Number(item._rawPrice);
+            const maxPrice = data.priceMax ? data.priceMax * 10000 : Infinity;
+
+            if (data.priceMax && itemPrice > maxPrice) return false;
+            if (data.areaMin && item.area.m2 < data.areaMin) return false;
+
+            return true;
+        });
+
+        // 5. Send Telegram Notification (Async)
+        (async () => {
+            try {
+                // Updated: Save results to DB
+                const savedSettings = await prisma.searchSetting.create({
+                    data: {
+                        regions: data.regions ? data.regions.join(',') : '',
+                        type: data.tradeType,
+                        priceMax: data.priceMax || null,
+                        areaMin: data.areaMin || null,
+                        areaMax: null,
+                        roomCount: data.roomCount || null,
+                        results: filtered.map((a: any) => ({
+                            id: String(a.atclNo),
+                            name: a.atclNm || 'Unknown',
+                            price: Number(a.prc) || 0,
+                            area: {
+                                m2: Number(a.spc1) || 0,
+                                pyeong: Math.round((Number(a.spc1) || 0) * 0.3025 * 10) / 10
+                            },
+                            link: `https://fintech-api.land.naver.com/v1/ad/article/${a.atclNo}`,
+                            dongName: a._dongName || '',
+                            note: (a.note as any) || undefined
+                        })) as any
+                    } as any
+                });
+                console.log(`Saved search results snapshot with ID: ${savedSettings.id}`);
+            } catch (e) {
+                console.error('Non-critical DB save failure (Telegram/Snapshot):', e);
+            }
+
+            try {
+                if (filtered.length === 0) {
+                    await telegram.sendMessage(`📉 **[부동산 봇]**\n조건에 맞는 매물이 없습니다.\n지정된 구: ${data.regions.join(', ')}`);
+                    return;
+                }
+
+                const header = `🏘 **[부동산 봇] 검색 결과 (${filtered.length}건)**\n조건: ${data.regions.join(', ')} ${data.priceMax}억 이하\n\n`;
+                let message = header;
+                const messages = [];
+
+                for (const item of filtered) {
+                    const priceEok = Math.floor(item.price / 10000);
+                    const priceMan = item.price % 10000;
+                    const priceStr = priceEok > 0 ? `${priceEok}억` + (priceMan ? ` ${priceMan}` : '') : `${priceMan}만`;
+
+                    const line = `🔹 <a href="${item.link}">${item.name}</a>\n   💰 ${priceStr} | ${item.area?.pyeong || '-'}평\n\n`;
+
+                    if (message.length + line.length > 3500) { // Telegram 4096 limit
+                        messages.push(message);
+                        message = `(이어서)\n\n${line}`;
+                    } else {
+                        message += line;
+                    }
+                }
+                messages.push(message);
+
+                for (const msg of messages) {
+                    await telegram.sendMessage(msg, 'HTML');
+                }
+            } catch (e) {
+                console.error('Failed to send telegram notification:', e);
+            }
+        })();
+
+        return filtered;
+    } catch (error: any) {
+        console.error('[searchProperties] UNHANDLED ERROR:', error);
+        // CRITICAL: Return empty array instead of throwing to prevent Next.js RSC crash (HTML error page)
+        return [];
+    }
 }
 
 export async function updatePropertyNote(id: string, note: string) {
@@ -167,4 +198,46 @@ export async function updatePropertyNote(id: string, note: string) {
         console.error('[updatePropertyNote] FAILED to update property note', e);
         throw e; // Rethrow so frontend/Sentry catches it
     }
+}
+
+/**
+ * Chunked Search for Heavy Regions
+ */
+export async function searchPropertiesChunk(data: FilterValues, regionCode: string, startIndex: number, endIndex: number): Promise<Property[]> {
+    try {
+        console.log(`[searchPropertiesChunk] Chunk ${startIndex}-${endIndex} for ${regionCode}`);
+
+        const priceMaxManWon = (data.priceMax || 0) * 10000;
+        const criteria: SearchCriteria = {
+            tradeType: data.tradeType as any,
+            priceMax: priceMaxManWon > 0 ? priceMaxManWon : undefined,
+            areaMin: data.areaMin || undefined,
+            roomCount: data.roomCount || undefined,
+        };
+
+        const results = await naverLand.getArticleListByChunk(regionCode, criteria, startIndex, endIndex);
+
+        // Refine filtering
+        const filtered = results.filter((item: any) => {
+            const itemPrice = Number(item._rawPrice);
+            const maxPrice = data.priceMax ? data.priceMax * 10000 : Infinity;
+            if (data.priceMax && itemPrice > maxPrice) return false;
+            if (data.areaMin && item.area.m2 < data.areaMin) return false;
+            return true;
+        });
+
+        return filtered;
+    } catch (e) {
+        console.error('[searchPropertiesChunk] Error', e);
+        return [];
+    }
+}
+
+/**
+ * Get Point Count for a Region (to help client chunking)
+ */
+export async function getRegionPointCount(region: string): Promise<{ code: string; count: number }> {
+    const code = await naverLand.getRegionCode(region);
+    const count = naverLand.getPointCount(code);
+    return { code, count };
 }

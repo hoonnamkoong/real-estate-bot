@@ -18,8 +18,23 @@ interface ListingTableProps {
     onNoteChange: (id: string, note: string) => void;
 }
 
+const getNaverLandUrl = (atclNo: string) => {
+    if (typeof window === 'undefined') return `https://m.land.naver.com/article/info/${atclNo}`;
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+        window.navigator.userAgent
+    );
+    return isMobile
+        ? `https://m.land.naver.com/article/info/${atclNo}`
+        : `https://land.naver.com/article/articleDetailInfo.nhn?atclNo=${atclNo}`;
+};
+
 export function ListingTable({ data, onNoteChange }: ListingTableProps) {
-    const rows = data.map((item) => {
+    if (!data) return null;
+
+    const rows = data.filter(item => item).map((item) => {
+        if (!item.id || typeof item.price !== 'number') {
+            console.warn('[ListingTable] Problematic item detected:', item);
+        }
         // Format Price: 15억 5,000 or similar
         // Input is in Man-won (e.g. 155000 -> 15억 5000)
         const priceEok = Math.floor(item.price / 10000);
@@ -39,15 +54,15 @@ export function ListingTable({ data, onNoteChange }: ListingTableProps) {
 
                 <Table.Td>
                     <Group gap="xs">
-                        <Text>{item.area.m2}m²</Text>
-                        <Text c="dimmed" size="sm">({item.area.pyeong}평)</Text>
+                        <Text>{item.area?.m2 || '-'}m²</Text>
+                        <Text c="dimmed" size="sm">({item.area?.pyeong || '-'}평)</Text>
                     </Group>
                 </Table.Td>
                 <Table.Td>
                     <Text size="sm">{item.dongName || '-'}</Text>
                 </Table.Td>
                 <Table.Td>
-                    <Button component="a" href={item.link} target="_blank" size="xs" variant="light">
+                    <Button component="a" href={getNaverLandUrl(item.id)} target="_blank" size="xs" variant="light">
                         보기
                     </Button>
                 </Table.Td>
@@ -92,8 +107,9 @@ export function ListingTable({ data, onNoteChange }: ListingTableProps) {
             {/* Mobile Card View */}
             <Stack hiddenFrom="sm" gap="md">
                 {data.map((item) => {
-                    const priceEok = Math.floor(item.price / 10000);
-                    const priceMan = item.price % 10000;
+                    const price = Number(item.price) || 0;
+                    const priceEok = Math.floor(price / 10000);
+                    const priceMan = price % 10000;
                     const priceStr = priceEok > 0
                         ? `${priceEok}억 ${priceMan > 0 ? priceMan.toLocaleString() : ''}`
                         : `${priceMan.toLocaleString()}만`;
@@ -110,12 +126,12 @@ export function ListingTable({ data, onNoteChange }: ListingTableProps) {
                             <Group justify="space-between" mb="sm">
                                 <Group gap="xs">
                                     <Text size="sm" c="dimmed">면적</Text>
-                                    <Text size="sm">{item.area.m2}m² ({item.area.pyeong}평)</Text>
+                                    <Text size="sm">{item.area?.m2 || '-'}m² ({item.area?.pyeong || '-'}평)</Text>
                                 </Group>
                             </Group>
 
                             <Group grow>
-                                <Button component="a" href={item.link} target="_blank" variant="light" color="blue">
+                                <Button component="a" href={getNaverLandUrl(item.id)} target="_blank" variant="light" color="blue">
                                     매물 보기
                                 </Button>
                                 <Select

@@ -1,4 +1,5 @@
 import { logger } from '@/lib/logger';
+import { Property } from '@/components/Property/ListingTable';
 
 // Types for Search Criteria
 export interface SearchCriteria {
@@ -16,28 +17,17 @@ export class NaverLandService {
     // Dong Coordinates Registry (Approximate Centers)
     private DONG_REGISTRY: Record<string, { name: string; lat: number; lon: number }[]> = {
         // --- GANGNAM 3-GU ---
-        '1171000000': [ // Songpa-gu
-            { name: '잠실1(엘스/리센츠)', lat: 37.512, lon: 127.085 },
-            { name: '잠실2(트리지움/레이크)', lat: 37.509, lon: 127.093 },
-            { name: '잠실3(아시아선수촌)', lat: 37.508, lon: 127.075 },
-            { name: '잠실4(파크리오)', lat: 37.521, lon: 127.103 },
-            { name: '신천(장미)', lat: 37.518, lon: 127.103 },
-            { name: '풍납1(북부)', lat: 37.538, lon: 127.123 },
-            { name: '풍납2(중부)', lat: 37.529, lon: 127.117 },
-            { name: '풍납3(남부)', lat: 37.522, lon: 127.110 },
-            { name: '방이1(먹자골목)', lat: 37.513, lon: 127.110 },
-            { name: '방이2(올림픽공원)', lat: 37.512, lon: 127.125 },
-            { name: '송파1(송파동)', lat: 37.505, lon: 127.115 },
-            { name: '석촌(석촌호수)', lat: 37.503, lon: 127.105 },
-            { name: '삼전', lat: 37.502, lon: 127.090 },
-            { name: '오금', lat: 37.503, lon: 127.135 },
-            { name: '가락1(헬리오시티)', lat: 37.496, lon: 127.108 },
-            { name: '가락2(가락시장)', lat: 37.493, lon: 127.125 },
-            { name: '문정1(로데오)', lat: 37.488, lon: 127.120 },
-            { name: '문정2(법조타운)', lat: 37.483, lon: 127.120 },
-            { name: '장지', lat: 37.478, lon: 127.130 },
-            { name: '거여', lat: 37.493, lon: 127.145 },
-            { name: '마천', lat: 37.495, lon: 127.155 }
+        '1171000000': [ // Songpa-gu (Optimized Top 10 for speed)
+            { name: '잠실엘스/리센츠', lat: 37.512, lon: 127.085 },
+            { name: '잠실트리지움/레이크', lat: 37.509, lon: 127.093 },
+            { name: '잠실파크리오', lat: 37.521, lon: 127.103 },
+            { name: '장미/신천', lat: 37.518, lon: 127.103 },
+            { name: '올림픽공원/방이', lat: 37.512, lon: 127.125 },
+            { name: '헬리오시티/가락', lat: 37.496, lon: 127.108 },
+            { name: '가락시장역', lat: 37.493, lon: 127.125 },
+            { name: '문정법조타운', lat: 37.483, lon: 127.120 },
+            { name: '오금동', lat: 37.503, lon: 127.135 },
+            { name: '거여/마천', lat: 37.493, lon: 127.145 }
         ],
         '1168000000': [ // Gangnam-gu
             { name: '압구정1(구현대)', lat: 37.530, lon: 127.028 },
@@ -298,7 +288,7 @@ export class NaverLandService {
     /**
      * Get Article List using Direct API Fetch (No Puppeteer)
      */
-    async getArticleList(cortarNo: string, criteria: SearchCriteria) {
+    async getArticleList(cortarNo: string, criteria: SearchCriteria, isInteractive: boolean = false) {
         logger.info('NaverLandService', 'Fetching Article List (Dong Search)', { cortarNo, criteria });
 
         try {
@@ -310,13 +300,19 @@ export class NaverLandService {
 
             if (this.DONG_REGISTRY[cortarNo]) {
                 searchPoints = this.DONG_REGISTRY[cortarNo];
-                logger.info('NaverLandService', `Using ${searchPoints.length} Known Dong Centers`);
+                if (isInteractive) {
+                    // For heavy regions like Songpa/Gangnam, 1 point is the absolute maximum for < 10s
+                    searchPoints = searchPoints.slice(0, 1);
+                    logger.info('NaverLandService', `DRACONIAN INTERACTIVE LIMIT: Taking top 1 point (of ${this.DONG_REGISTRY[cortarNo].length})`);
+                } else {
+                    logger.info('NaverLandService', `Using ${searchPoints.length} Known Dong Centers`);
+                }
             } else {
-                // Fallback: 4x4 Grid
+                // Fallback: Grid
                 const { lat: centerLat, lon: centerLon } = this.getRegionCoords(cortarNo);
-                const gridSize = 4;
-                const step = 0.04;
-                const startOffset = -0.06;
+                const gridSize = isInteractive ? 2 : 4;
+                const step = isInteractive ? 0.08 : 0.04;
+                const startOffset = isInteractive ? -0.04 : -0.06;
                 for (let i = 0; i < gridSize; i++) {
                     for (let j = 0; j < gridSize; j++) {
                         searchPoints.push({
@@ -326,7 +322,7 @@ export class NaverLandService {
                         });
                     }
                 }
-                logger.info('NaverLandService', 'Using Generic Grid Search');
+                logger.info('NaverLandService', `Using ${isInteractive ? '2x2' : '4x4'} Grid Search`);
             }
 
             const fetchSubRegion = async (point: { name: string, lat: number, lon: number }) => {
@@ -337,7 +333,7 @@ export class NaverLandService {
                 const rgt = lon + subBoxSize;
 
                 const allSubItems: any[] = [];
-                const maxPages = 5; // Restore deep search as per user request
+                const maxPages = isInteractive ? 2 : 5; // Limit to 2 pages for interactive to prevent timeouts
 
                 for (let page = 1; page <= maxPages; page++) {
                     const params = new URLSearchParams();
@@ -389,15 +385,31 @@ export class NaverLandService {
                 return allSubItems;
             };
 
-            // Execute Sequentially with Delay to prevent Blocking
-            // User requested: "Don't get blocked, time doesn't matter".
-            const results: any[] = [];
-            for (const point of searchPoints) {
-                const subResult = await fetchSubRegion(point);
-                results.push(subResult);
-                // 500ms delay between points
-                await new Promise(resolve => setTimeout(resolve, 500));
-            }
+            // Parallel execute with safer 7.5s internal limit for Vercel Hobby
+            const startTime = Date.now();
+            const MAX_MS = 7500; // Allow more time for individual point fetches
+
+            console.log(`[NaverLandService] Fetching ${searchPoints.length} points in parallel...`);
+
+            const resultsArrays = await Promise.all(
+                searchPoints.map(async (point, idx) => {
+                    const elapsed = Date.now() - startTime;
+                    if (isInteractive && (elapsed > MAX_MS)) {
+                        console.warn(`[NaverLandService] SKIP: Point #${idx} (${point.name}) at ${elapsed}ms due to limit`);
+                        return [];
+                    }
+                    try {
+                        const pStart = Date.now();
+                        const list = await fetchSubRegion(point);
+                        console.log(`[NaverLandService] DONE: Point #${idx} (${point.name}) in ${Date.now() - pStart}ms, items=${list.length}`);
+                        return list;
+                    } catch (e) {
+                        return [];
+                    }
+                })
+            );
+
+            const results = resultsArrays.flat();
 
             // Aggregate and Deduplicate
             const allItems = results.flat();
@@ -417,20 +429,25 @@ export class NaverLandService {
             });
 
             // Map to Property Interface
-            const articles = uniqueList.map((item: any) => ({
-                id: item.atclNo,
-                name: item.atclNm,
-                price: typeof item.prc === 'number' ? item.prc : parseInt(item.prc),
-                households: 0,
-                area: {
-                    m2: typeof item.spc1 === 'string' ? parseFloat(item.spc1) : item.spc1,
-                    pyeong: typeof item.spc1 === 'string' ? Math.round(parseFloat(item.spc1) / 3.3) : Math.round(item.spc1 / 3.3)
-                },
-                link: `https://m.land.naver.com/article/info/${item.atclNo}`,
-                note: undefined,
-                _rawPrice: item.prc,
-                dongName: item._dongName
-            }));
+            const articles = uniqueList.map((item: any) => {
+                const spc1 = typeof item.spc1 === 'string' ? parseFloat(item.spc1) : (Number(item.spc1) || 0);
+                const price = typeof item.prc === 'number' ? item.prc : (parseInt(item.prc) || 0);
+
+                return {
+                    id: String(item.atclNo || Math.random().toString(36).substr(2, 9)),
+                    name: item.atclNm || 'Unknown Property',
+                    price: price,
+                    households: 0,
+                    area: {
+                        m2: spc1,
+                        pyeong: spc1 > 0 ? Math.round(spc1 / 3.3058) : 0
+                    },
+                    link: item.atclNo ? `https://m.land.naver.com/article/info/${item.atclNo}` : '#',
+                    note: undefined,
+                    _rawPrice: price,
+                    dongName: item._dongName || '-'
+                };
+            });
 
             // Sort by Dong Name then Price
             articles.sort((a, b) => {
@@ -446,6 +463,106 @@ export class NaverLandService {
 
         } catch (error) {
             logger.error('NaverLandService', 'API Fetch Failed', { error });
+            return [];
+        }
+    }
+
+    /**
+     * Get Total Number of Points for a region
+     */
+    getPointCount(regionCode: string): number {
+        return this.DONG_REGISTRY[regionCode]?.length || 0;
+    }
+
+    /**
+     * Get Article List for a specific chunk (range of points)
+     */
+    async getArticleListByChunk(regionCode: string, criteria: SearchCriteria, startIndex: number, endIndex: number): Promise<Property[]> {
+        const allPoints = this.DONG_REGISTRY[regionCode] || [];
+        const searchPoints = allPoints.slice(startIndex, endIndex);
+
+        if (searchPoints.length === 0) return [];
+
+        console.log(`[NaverLandService] Fetching chunk [${startIndex}-${endIndex}] for ${regionCode} (${searchPoints.length} points)`);
+
+        try {
+            const fetchSubRegion = async (point: { name: string; lat: number; lon: number }) => {
+                let allSubItems: any[] = [];
+                for (let page = 1; page <= 2; page++) {
+                    const params = new URLSearchParams({
+                        reitId: '', rletTpCd: 'OPST:APT:JGC:ABYG', tradTpCd: criteria.tradeType || 'A1',
+                        z: '15', lat: String(point.lat), lon: String(point.lon),
+                        btm: String(point.lat - 0.01), lft: String(point.lon - 0.01),
+                        top: String(point.lat + 0.01), rgt: String(point.lon + 0.01),
+                        pgr: String(page), cortNo: regionCode
+                    });
+
+                    if (criteria.priceMax) params.append('prc', `0:${criteria.priceMax}`);
+                    if (criteria.areaMin) params.append('spcMin', String(criteria.areaMin));
+                    if (criteria.roomCount) params.append('rom', String(criteria.roomCount));
+
+                    const apiUrl = `${NAVER_LAND_MOBILE_HOST}/cluster/ajax/articleList?${params.toString()}`;
+
+                    const response = await fetch(apiUrl, {
+                        headers: {
+                            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
+                            'Referer': 'https://m.land.naver.com/'
+                        }
+                    });
+                    if (!response.ok) break;
+                    const json = await response.json();
+                    const items = Array.isArray(json.body) ? json.body : [];
+                    if (items.length === 0) {
+                        // If center of point has no results, don't stop entire point search, 
+                        // but maybe current coordinates don't have matching filter.
+                        // However, since we use clustering, usually page 1 has something if it exists.
+                        // We continue instead of break to allow other searchPoints in the chunk.
+                        break;
+                    }
+
+                    allSubItems.push(...items.map((item: any) => ({
+                        ...item,
+                        _dongName: this.DONG_CODE_MAP[item.cortarNo] || point.name
+                    })));
+                    if (items.length < 20) break;
+                }
+                return allSubItems;
+            };
+
+            const resultsArrays = await Promise.all(
+                searchPoints.map(async (point) => {
+                    try {
+                        return await fetchSubRegion(point);
+                    } catch (e) {
+                        return [];
+                    }
+                })
+            );
+
+            const allItems = resultsArrays.flat();
+            const uniqueMap = new Map();
+            allItems.forEach((item: any) => {
+                if (!uniqueMap.has(item.atclNo)) {
+                    uniqueMap.set(item.atclNo, item);
+                }
+            });
+
+            return Array.from(uniqueMap.values()).map((item: any) => {
+                const spc1 = typeof item.spc1 === 'string' ? parseFloat(item.spc1) : (Number(item.spc1) || 0);
+                const price = typeof item.prc === 'number' ? item.prc : (parseInt(item.prc) || 0);
+                return {
+                    id: String(item.atclNo),
+                    name: item.atclNm || 'Unknown',
+                    price: price,
+                    households: 0,
+                    area: { m2: spc1, pyeong: spc1 > 0 ? Math.round(spc1 / 3.3058) : 0 },
+                    link: `https://m.land.naver.com/article/info/${item.atclNo}`,
+                    _rawPrice: price,
+                    dongName: item._dongName || '-'
+                };
+            });
+        } catch (e) {
+            console.error('getArticleListByChunk Error', e);
             return [];
         }
     }
