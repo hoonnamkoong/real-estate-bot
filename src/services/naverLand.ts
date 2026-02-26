@@ -341,13 +341,11 @@ export class NaverLandService {
                     if (criteria.priceMax) params.append('prc', `0:${criteria.priceMax}`);
                     // spcMin and rom removed from API params to simplify request
 
-                    const rawApiUrl = `${NAVER_LAND_MOBILE_HOST}/cluster/ajax/articleList?${params.toString()}`;
-                    // Use a proxy to bypass Vercel datacenter IP block
-                    const apiUrl = `https://corsproxy.io/?${encodeURIComponent(rawApiUrl)}`;
+                    const apiUrl = `${NAVER_LAND_MOBILE_HOST}/cluster/ajax/articleList?${params.toString()}`;
 
                     try {
                         const controller = new AbortController();
-                        const timeoutId = setTimeout(() => controller.abort(), 4500); // Give proxy more time
+                        const timeoutId = setTimeout(() => controller.abort(), 4500); // Give enough time for direct call
 
                         const response = await fetch(apiUrl, {
                             cache: 'no-store',
