@@ -9,10 +9,11 @@ const { chromium } = require('playwright');
 
     try {
         console.log('Navigating to Vercel production...');
-        await page.goto('https://real-estate-bot-eta.vercel.app/', { waitUntil: 'networkidle', timeout: 60000 });
+        // Force no-cache navigation
+        await page.goto('https://real-estate-bot-eta.vercel.app/?v=' + Date.now(), { waitUntil: 'networkidle', timeout: 60000 });
 
-        // WAIT 5s for the LATEST deployment to settle in the browser
-        await page.waitForTimeout(5000);
+        console.log('Waiting 15s for the MOST RECENT build to settle...');
+        await page.waitForTimeout(15000);
 
         console.log('Setting filters (PRICE 30 to show real data if possible)...');
         const regionInput = page.locator('input[placeholder*="구 선택"]');
@@ -33,10 +34,10 @@ const { chromium } = require('playwright');
         const searchBtn = page.locator('button:has-text("지금 탐색")');
         await searchBtn.click({ force: true });
 
-        console.log('Waiting 30 seconds for ANY result (real or mock)...');
-        await page.waitForTimeout(30000);
+        console.log('Waiting 40 seconds to guarantee result OR mock appearance...');
+        await page.waitForTimeout(40000);
 
-        const finalScreenshot = 'c:/Users/Hoon_DT/gemini/real-estate-bot/production_final_result_songpa.png';
+        const finalScreenshot = 'c:/Users/Hoon_DT/gemini/real-estate-bot/production_final_result_songpa_v3.png';
         await page.screenshot({ path: finalScreenshot, fullPage: true });
         console.log(`✔ FINAL SCREENSHOT: ${finalScreenshot}`);
 
@@ -46,6 +47,9 @@ const { chromium } = require('playwright');
         if (rowsCount > 0) {
             const firstRowText = await page.locator('table tbody tr').first().innerText();
             console.log(`FIRST_ITEM: ${firstRowText.replace(/\n/g, ' ')}`);
+        } else {
+            const resultsDiv = await page.locator('h4:has-text("검색 결과") + div, h4:has-text("검색 결과") + p').count();
+            console.log('DEBUG_RESULTS_DIV_COUNT: ' + resultsDiv);
         }
 
     } catch (e) {

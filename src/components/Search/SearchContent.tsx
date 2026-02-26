@@ -70,7 +70,7 @@ export function SearchContent({ initialData }: SearchContentProps) {
                         area: { m2: 132, pyeong: 40 },
                         link: 'https://m.land.naver.com/',
                         dongName: '잠실동',
-                        note: '실환경 표 출력 확인용'
+                        note: 'Mid'
                     }];
                 }
                 setProperties(results);

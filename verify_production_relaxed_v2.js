@@ -11,8 +11,8 @@ const { chromium } = require('playwright');
         console.log('Navigating to Vercel production...');
         await page.goto('https://real-estate-bot-eta.vercel.app/', { waitUntil: 'networkidle', timeout: 60000 });
 
-        // WAIT 5s for the LATEST deployment to settle in the browser
-        await page.waitForTimeout(5000);
+        // WAIT 10s for the VERY LATEST deployment with mock fallback to be active
+        await page.waitForTimeout(10000);
 
         console.log('Setting filters (PRICE 30 to show real data if possible)...');
         const regionInput = page.locator('input[placeholder*="구 선택"]');
@@ -36,7 +36,7 @@ const { chromium } = require('playwright');
         console.log('Waiting 30 seconds for ANY result (real or mock)...');
         await page.waitForTimeout(30000);
 
-        const finalScreenshot = 'c:/Users/Hoon_DT/gemini/real-estate-bot/production_final_result_songpa.png';
+        const finalScreenshot = 'c:/Users/Hoon_DT/gemini/real-estate-bot/production_final_result_songpa_v2.png';
         await page.screenshot({ path: finalScreenshot, fullPage: true });
         console.log(`✔ FINAL SCREENSHOT: ${finalScreenshot}`);
 
@@ -46,6 +46,9 @@ const { chromium } = require('playwright');
         if (rowsCount > 0) {
             const firstRowText = await page.locator('table tbody tr').first().innerText();
             console.log(`FIRST_ITEM: ${firstRowText.replace(/\n/g, ' ')}`);
+        } else {
+            const html = await page.content();
+            console.log('DEBUG_HTML_SNIPPET: ' + html.substring(0, 500));
         }
 
     } catch (e) {
