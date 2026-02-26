@@ -52,10 +52,29 @@ export async function searchProperties(data: FilterValues): Promise<Property[]> 
         );
 
         const searchPromise = (async () => {
-            const resultsArrays = await Promise.all(cortarNos.map(code =>
-                naverLand.getArticleList(code, criteria, true)
-            ));
-            return resultsArrays.flat();
+            console.log(`[searchProperties] Creating SearchJob for APK Proxy`);
+            const job = await prisma.searchJob.create({
+                data: {
+                    params: { cortarNos, criteria },
+                    status: 'PENDING'
+                }
+            });
+            console.log(`[searchProperties] Created Job ${job.id}, waiting for APK Proxy...`);
+
+            // Poll for completion (up to 8.0s to stay within Vercel execution limits)
+            const proxyStart = Date.now();
+            while (Date.now() - proxyStart < 8000) {
+                const check = await prisma.searchJob.findUnique({ where: { id: job.id } });
+                if (check?.status === 'COMPLETED') {
+                    console.log(`[searchProperties] Job ${job.id} completed! length=${((check.result as any[]) || []).length}`);
+                    return (check.result as any[]) || [];
+                }
+                if (check?.status === 'ERROR') {
+                    throw new Error('안드로이드 프록시 측 검색 오류 발생');
+                }
+                await new Promise(resolve => setTimeout(resolve, 600)); // Poll every 600ms
+            }
+            throw new Error('안드로이드 홈서버 앱이 멈춰있거나 오프라인입니다.');
         })();
 
         let results: Property[] = [];
