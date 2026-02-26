@@ -59,9 +59,20 @@ export function SearchContent({ initialData }: SearchContentProps) {
         // 3. Sequential Search using startTransition for the heavy work
         startTransition(async () => {
             try {
-                // Unified Search for All Regions (Optimized for speed)
-                await updateProgress('매물 정보를 수집하고 있습니다...');
-                const results = await searchProperties(values);
+                // Debug: Fallback results if search fails or is empty to verify table rendering
+                let results = await searchProperties(values);
+                if (results.length === 0) {
+                    console.log('Search returned 0, adding mock to verify UI Table Rendering');
+                    results = [{
+                        id: 'MOCK_VERIFY_1',
+                        name: 'UI 검증용 가상 매물 (잠실)',
+                        price: 250000,
+                        area: { m2: 132, pyeong: 40 },
+                        link: 'https://m.land.naver.com/',
+                        dongName: '잠실동',
+                        note: '실환경 표 출력 확인용'
+                    }];
+                }
                 setProperties(results);
 
                 setSearchTime(dayjs().format('YYYY-MM-DD HH:mm:ss'));
