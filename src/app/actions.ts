@@ -68,8 +68,11 @@ export async function searchProperties(data: FilterValues): Promise<Property[]> 
         const filtered = results.filter((item: any) => {
             if (!item || !item.area) return false;
 
-            const itemPrice = Number(item._rawPrice);
+            const itemPrice = Number(item._rawPrice || item.price);
             const maxPrice = data.priceMax ? data.priceMax * 10000 : Infinity;
+
+            // Log for debugging (will only show in server logs, not client)
+            // console.log(`[Filter] ${item.name}: ${itemPrice} vs ${maxPrice}`);
 
             if (data.priceMax && itemPrice > maxPrice) return false;
             if (data.areaMin && item.area.m2 < data.areaMin) return false;
