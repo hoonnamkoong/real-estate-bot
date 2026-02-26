@@ -291,7 +291,7 @@ export class NaverLandService {
             // If Region is in Registry, use named Dongs.
             // If not, use generic 4x4 Grid.
             let searchPoints: { name: string, lat: number, lon: number }[] = [];
-            const subBoxSize = 0.02; // 2km radius is safe for both Dong and Grid
+            const subBoxSize = 0.04; // Increased for better coverage per point
 
             if (this.DONG_REGISTRY[cortarNo]) {
                 searchPoints = this.DONG_REGISTRY[cortarNo];
@@ -329,7 +329,7 @@ export class NaverLandService {
                     params.append('cortarNo', cortarNo);
                     params.append('rletTpCd', 'APT:ABYG:JGC');
                     params.append('tradTpCd', criteria.tradeType || 'A1');
-                    params.append('z', '16');
+                    params.append('z', '15'); // Better zoom level for cluster search
                     params.append('lat', String(lat));
                     params.append('lon', String(lon));
                     params.append('btm', String(btm.toFixed(7)));
@@ -383,10 +383,6 @@ export class NaverLandService {
             const resultsArrays = await Promise.all(
                 searchPoints.map(async (point, idx) => {
                     const elapsed = Date.now() - startTime;
-                    if (isInteractive && (elapsed > MAX_MS)) {
-                        console.warn(`[NaverLandService] SKIP: Point #${idx} (${point.name}) at ${elapsed}ms due to limit`);
-                        return [];
-                    }
                     try {
                         const pStart = Date.now();
                         const list = await fetchSubRegion(point);
