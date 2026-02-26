@@ -344,13 +344,18 @@ export class NaverLandService {
                     const apiUrl = `${NAVER_LAND_MOBILE_HOST}/cluster/ajax/articleList?${params.toString()}`;
 
                     try {
+                        const controller = new AbortController();
+                        const timeoutId = setTimeout(() => controller.abort(), 2500);
+
                         const response = await fetch(apiUrl, {
                             cache: 'no-store', // Bypass any server-side or Vercel cache
+                            signal: controller.signal as any,
                             headers: {
                                 'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
                                 'Referer': 'https://m.land.naver.com/'
                             }
                         });
+                        clearTimeout(timeoutId);
                         if (!response.ok) break;
                         const json = await response.json();
                         const items = Array.isArray(json.body) ? json.body : [];
@@ -381,7 +386,7 @@ export class NaverLandService {
             console.log(`[NaverLandService] Fetching ${searchPoints.length} points with concurrency limit (Batch size: 4)...`);
 
             const resultsArrays: any[][] = [];
-            const CONCURRENCY = 4;
+            const CONCURRENCY = 2; // Reduce to avoid triggering naive rate limits
 
             for (let i = 0; i < searchPoints.length; i += CONCURRENCY) {
                 const batch = searchPoints.slice(i, i + CONCURRENCY);
