@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Container, Title, Text, Stack, Box, LoadingOverlay, Group } from '@mantine/core';
 import { FilterForm, FilterValues } from '@/components/Search/FilterForm';
 import { ListingTable, Property } from '@/components/Property/ListingTable';
@@ -20,9 +20,8 @@ export function SearchContent({ initialData }: SearchContentProps) {
     }, [initialData]);
     // Initialize with snapshot results if available
     const [properties, setProperties] = useState<Property[]>(initialData?.results || []);
-    const [isPending, startTransition] = useTransition();
-    // If we have results, consider it 'searched'
-    const [searched, setSearched] = useState(!!initialData?.results && initialData.results.length > 0);
+    const [loading, setLoading] = useState(false);
+    const [searched, setSearched] = useState(initialData && initialData.results?.length > 0 ? true : false);
     const [searchTime, setSearchTime] = useState<string | null>(initialData?.results?.length ? 'Last Snapshot' : null);
 
     const searchParams = useSearchParams();
@@ -52,47 +51,48 @@ export function SearchContent({ initialData }: SearchContentProps) {
         router.replace(`${pathname}?${params.toString()}`);
 
         // 2. Initial UI State (Immediate)
+        setLoading(true); // Set loading to true
         setProperties([]);
         setSearched(true);
         setLoadingMessage('검색 준비 중...');
 
-        // 3. Sequential Search using startTransition for the heavy work
-        startTransition(async () => {
-            try {
-                // Debug: Fallback results if search fails or is empty to verify table rendering
-                let results = await searchProperties(values);
-                if (results.length === 0) {
-                    console.log('Search returned 0, adding mock to verify UI Table Rendering');
-                    results = [{
-                        id: 'MOCK_VERIFY_1',
-                        name: 'UI 검증용 가상 매물 (잠실)',
-                        price: 250000,
-                        area: { m2: 132, pyeong: 40 },
-                        link: 'https://m.land.naver.com/',
-                        dongName: '잠실동',
-                        note: 'Mid'
-                    }];
-                }
-                setProperties(results);
+        try {
+            // Fetch results from server action
+            let results = await searchProperties(values);
 
-                setSearchTime(dayjs().format('YYYY-MM-DD HH:mm:ss'));
-                setLoadingMessage(null);
-            } catch (error: any) {
-                console.error('[handleSearch] Search failed:', error);
-                // Fallback to mock on error to verify table UI
-                setProperties([{
-                    id: 'ERROR_VERIFY_1',
-                    name: `에러 시 UI 검증용 (${error.message || 'Timeout'})`,
-                    price: 200000,
-                    area: { m2: 84, pyeong: 25 },
+            if (results.length === 0) {
+                console.log('Search returned 0, adding mock to verify UI Table Rendering');
+                results = [{
+                    id: 'MOCK_VERIFY_1',
+                    name: 'UI 검증용 가상 매물 (잠실)',
+                    price: 250000,
+                    area: { m2: 132, pyeong: 40 },
                     link: 'https://m.land.naver.com/',
-                    dongName: '에러 복구 모드',
-                    note: 'Low'
-                }]);
-                setLoadingMessage(`에러 발생: ${error.message || 'Unknown'}`);
-                setTimeout(() => setLoadingMessage(null), 5000);
+                    dongName: '잠실동',
+                    note: 'Mid'
+                }];
             }
-        });
+            setProperties(results);
+
+            setSearchTime(dayjs().format('YYYY-MM-DD HH:mm:ss'));
+            setLoadingMessage(null);
+        } catch (error: any) {
+            console.error('[handleSearch] Search failed:', error);
+            // Fallback to mock on error to verify table UI
+            setProperties([{
+                id: 'ERROR_VERIFY_1',
+                name: `에러 시 UI 검증용 (${error.message || 'Timeout'})`,
+                price: 200000,
+                area: { m2: 84, pyeong: 25 },
+                link: 'https://m.land.naver.com/',
+                dongName: '에러 복구 모드',
+                note: 'Low'
+            }]);
+            setLoadingMessage(`에러 발생: ${error.message || 'Unknown'}`);
+            setTimeout(() => setLoadingMessage(null), 5000);
+        } finally {
+            setLoading(false); // Ensure loading is set to false after search completes or fails
+        }
     };
 
     // Derive initial values
@@ -156,7 +156,7 @@ export function SearchContent({ initialData }: SearchContentProps) {
             <Stack gap="xl">
                 <Box pos="relative">
                     <LoadingOverlay
-                        visible={isPending}
+                        visible={loading || !!loadingMessage}
                         overlayProps={{ radius: "sm", blur: 2 }}
                         loaderProps={{
                             children: (
@@ -169,7 +169,7 @@ export function SearchContent({ initialData }: SearchContentProps) {
                             )
                         }}
                     />
-                    <FilterForm onSearch={handleSearch} loading={isPending} initialValues={initialValues} />
+                    <FilterForm onSearch={handleSearch} loading={loading} initialValues={initialValues} />
                 </Box>
 
                 <Box>
@@ -187,9 +187,9 @@ export function SearchContent({ initialData }: SearchContentProps) {
                     {properties && properties.length > 0 ? (
                         <ListingTable data={properties} onNoteChange={handleNoteChange} />
                     ) : (
-                        searched && !isPending && <Text c="dimmed" ta="center" py="xl">조건에 맞는 매물이 없습니다.</Text>
+                        searched && !loading && <Text c="dimmed" ta="center" py="xl">조건에 맞는 매물이 없습니다.</Text>
                     )}
-                    {!searched && !isPending && <Text c="dimmed" ta="center" py="xl">검색 조건을 입력하고 검색 버튼을 눌러주세요.</Text>}
+                    {!searched && !loading && <Text c="dimmed" ta="center" py="xl">검색 조건을 입력하고 검색 버튼을 눌러주세요.</Text>}
 
                     <Text c="dimmed" size="xs" ta="center" mt="xl">
                         Real Estate Bot v1.5 (Telegram Enabled)
