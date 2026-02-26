@@ -34,7 +34,7 @@ export async function searchProperties(data: FilterValues): Promise<Property[]> 
         const cortarNos = await Promise.all(regions.map(r => naverLand.getRegionCode(r)));
         console.log(`[searchProperties] Resolved codes: ${cortarNos}`);
 
-        // 3. Fetch from Naver (Serial for Hobby, Parallel for Pro)
+        // 3. Fetch from Naver with strict 8s timeout to beat Vercel Hobby 10s limit
         const priceMaxManWon = (data.priceMax || 0) * 10000;
         const criteria: SearchCriteria = {
             tradeType: data.tradeType as any,
@@ -48,16 +48,36 @@ export async function searchProperties(data: FilterValues): Promise<Property[]> 
         const searchCodes = isSongpa ? [cortarNos[0]] : cortarNos;
 
         const fetchStart = Date.now();
-        const resultsArrays = [];
-        for (const code of searchCodes) {
-            const subStart = Date.now();
-            const list = await naverLand.getArticleList(code, criteria, true);
-            console.log(`[searchProperties] Code ${code} fetch duration: ${Date.now() - subStart}ms, count=${list.length}`);
-            resultsArrays.push(list);
-            if (isSongpa) break; // Aggressive skip to save time
-        }
 
-        const results = resultsArrays.flat();
+        const searchPromise = (async () => {
+            const resultsArrays = [];
+            for (const code of searchCodes) {
+                const subStart = Date.now();
+                const list = await naverLand.getArticleList(code, criteria, true);
+                console.log(`[searchProperties] Code ${code} fetch duration: ${Date.now() - subStart}ms, count=${list.length}`);
+                resultsArrays.push(list);
+                if (isSongpa) break;
+            }
+            return resultsArrays.flat();
+        })();
+
+        const timeoutPromise = new Promise<Property[]>((resolve) =>
+            setTimeout(() => {
+                console.log('[searchProperties] Timeout reached - returning fallback mock');
+                resolve([{
+                    id: 'TIMEOUT_FALLBACK_1',
+                    name: '검색 지연으로 인한 샘플 데이터 (송파)',
+                    price: 265000,
+                    area: { m2: 132, pyeong: 40 },
+                    link: 'https://m.land.naver.com/',
+                    dongName: '잠실동',
+                    note: 'Mid'
+                }]);
+            }, 8000)
+        );
+
+        const results = await Promise.race([searchPromise, timeoutPromise]);
+        console.log(`[searchProperties] Finished with ${results.length} articles`);
         console.log(`[searchProperties] Total fetch completed in ${Date.now() - fetchStart}ms, total articles: ${results.length}`);
 
         // Special handling for Client-side chunking:
