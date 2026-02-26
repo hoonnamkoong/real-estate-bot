@@ -59,43 +59,10 @@ export function SearchContent({ initialData }: SearchContentProps) {
         // 3. Sequential Search using startTransition for the heavy work
         startTransition(async () => {
             try {
-                const isSongpaIncluded = values.regions.includes('songpa');
-                const otherRegions = values.regions.filter(r => r !== 'songpa');
-
-                let allResults: Property[] = [];
-
-                // A. Fetch other regions normally
-                if (otherRegions.length > 0) {
-                    await updateProgress('기타 지역 검색 중...');
-                    const otherResults = await searchProperties({ ...values, regions: otherRegions });
-                    allResults = [...otherResults];
-                    setProperties([...allResults]);
-                }
-
-                // B. Fetch Songpa in chunks if included
-                if (isSongpaIncluded) {
-                    await updateProgress('송파구 구역 분석 중...');
-                    const { code, count } = await getRegionPointCount('songpa');
-
-                    const chunkSize = 2; // Reduced to 2 for even safer margin
-                    const totalChunks = Math.ceil(count / chunkSize);
-
-                    for (let i = 0; i < totalChunks; i++) {
-                        const start = i * chunkSize;
-                        const end = Math.min(start + chunkSize, count);
-                        await updateProgress(`송파구 탐색 진행 중 (${i + 1}/${totalChunks})...`);
-
-                        const chunkResults = await searchPropertiesChunk(values, code, start, end);
-
-                        // Merge and deduplicate with defensive null checks
-                        const existingIds = new Set(allResults.filter(p => p && p.id).map((p: Property) => p.id));
-                        const newUnique = chunkResults.filter((p: Property) => p && p.id && !existingIds.has(p.id));
-
-                        allResults = [...allResults, ...newUnique];
-                        console.log(`[handleSearch] Results aggregated (Count: ${allResults.length})`);
-                        setProperties([...allResults]);
-                    }
-                }
+                // Unified Search for All Regions (Optimized for speed)
+                await updateProgress('매물 정보를 수집하고 있습니다...');
+                const results = await searchProperties(values);
+                setProperties(results);
 
                 setSearchTime(dayjs().format('YYYY-MM-DD HH:mm:ss'));
                 setLoadingMessage(null);
