@@ -17,17 +17,12 @@ export class NaverLandService {
     // Dong Coordinates Registry (Approximate Centers)
     private DONG_REGISTRY: Record<string, { name: string; lat: number; lon: number }[]> = {
         // --- GANGNAM 3-GU ---
-        '1171000000': [ // Songpa-gu (Optimized Top 10 for speed)
-            { name: '잠실엘스/리센츠', lat: 37.512, lon: 127.085 },
-            { name: '잠실트리지움/레이크', lat: 37.509, lon: 127.093 },
-            { name: '잠실파크리오', lat: 37.521, lon: 127.103 },
-            { name: '장미/신천', lat: 37.518, lon: 127.103 },
-            { name: '올림픽공원/방이', lat: 37.512, lon: 127.125 },
-            { name: '헬리오시티/가락', lat: 37.496, lon: 127.108 },
-            { name: '가락시장역', lat: 37.493, lon: 127.125 },
-            { name: '문정법조타운', lat: 37.483, lon: 127.120 },
-            { name: '오금동', lat: 37.503, lon: 127.135 },
-            { name: '거여/마천', lat: 37.493, lon: 127.145 }
+        '1171000000': [ // Songpa-gu (Compressed to 5 points for Vercel Hobby 10s limit)
+            { name: '잠실/신천', lat: 37.512, lon: 127.090 },
+            { name: '파크리오/방이', lat: 37.518, lon: 127.115 },
+            { name: '가락/헬리오', lat: 37.496, lon: 127.110 },
+            { name: '문정/장지', lat: 37.483, lon: 127.122 },
+            { name: '오금/거여/마천', lat: 37.498, lon: 127.140 }
         ],
         '1168000000': [ // Gangnam-gu
             { name: '압구정1(구현대)', lat: 37.530, lon: 127.028 },
