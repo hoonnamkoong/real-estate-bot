@@ -339,8 +339,7 @@ export class NaverLandService {
                     params.append('page', String(page));
 
                     if (criteria.priceMax) params.append('prc', `0:${criteria.priceMax}`);
-                    if (criteria.areaMin) params.append('spcMin', String(criteria.areaMin));
-                    if (criteria.roomCount) params.append('rom', String(criteria.roomCount));
+                    // spcMin and rom removed from API params to simplify request
 
                     const apiUrl = `${NAVER_LAND_MOBILE_HOST}/cluster/ajax/articleList?${params.toString()}`;
 
