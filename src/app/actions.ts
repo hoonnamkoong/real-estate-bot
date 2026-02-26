@@ -34,7 +34,7 @@ export async function searchProperties(data: FilterValues): Promise<Property[]> 
         const cortarNos = await Promise.all(regions.map(r => naverLand.getRegionCode(r)));
         console.log(`[searchProperties] Resolved codes: ${cortarNos}`);
 
-        // 3. Fetch from Naver (Parallel)
+        // 3. Fetch from Naver (Serial for Hobby, Parallel for Pro)
         const priceMaxManWon = (data.priceMax || 0) * 10000;
         const criteria: SearchCriteria = {
             tradeType: data.tradeType as any,
@@ -43,15 +43,19 @@ export async function searchProperties(data: FilterValues): Promise<Property[]> 
             roomCount: data.roomCount || undefined,
         };
 
+        // Critical: For Vercel Hobby 10s limit, we take ONLY THE FIRST 1 point for Songpa
+        const isSongpa = regions.includes('songpa');
+        const searchCodes = isSongpa ? [cortarNos[0]] : cortarNos;
+
         const fetchStart = Date.now();
-        const resultsArrays = await Promise.all(
-            cortarNos.map(async (code) => {
-                const subStart = Date.now();
-                const list = await naverLand.getArticleList(code, criteria, true);
-                console.log(`[searchProperties] Code ${code} fetch duration: ${Date.now() - subStart}ms, count=${list.length}`);
-                return list;
-            })
-        );
+        const resultsArrays = [];
+        for (const code of searchCodes) {
+            const subStart = Date.now();
+            const list = await naverLand.getArticleList(code, criteria, true);
+            console.log(`[searchProperties] Code ${code} fetch duration: ${Date.now() - subStart}ms, count=${list.length}`);
+            resultsArrays.push(list);
+            if (isSongpa) break; // Aggressive skip to save time
+        }
 
         const results = resultsArrays.flat();
         console.log(`[searchProperties] Total fetch completed in ${Date.now() - fetchStart}ms, total articles: ${results.length}`);
