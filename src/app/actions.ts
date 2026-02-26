@@ -62,9 +62,10 @@ export async function searchProperties(data: FilterValues): Promise<Property[]> 
         // If results are incomplete or if it's a "heavy" region, we might want to tell the client to do more.
         // For now, we return what we found within the 5.5s limit.
 
-        // 4. Client-side Filtering (Re-enabled after API param minimization)
+        // 4. Client-side Filtering
         console.log(`[searchProperties] BEFORE_FILTER=${results.length}`);
 
+        const rawCount = results.length;
         const filtered = results.filter((item: any) => {
             if (!item || !item.area) return false;
 
@@ -76,6 +77,29 @@ export async function searchProperties(data: FilterValues): Promise<Property[]> 
             // Room count filter is handled via Naver's raw result generally, but good to have if we relaxed API
             return true;
         });
+
+        // 5. Debug Info (Visible at the top for current session)
+        if (filtered.length === 0 && rawCount > 0) {
+            filtered.unshift({
+                id: 'DEBUG_INFO',
+                name: `[시스템 점검] 원천 데이터 ${rawCount}건 중 필터 조건 합치 0건`,
+                price: 0,
+                area: { m2: 0, pyeong: 0 },
+                link: '#',
+                dongName: '시스템',
+                note: 'Low'
+            } as any);
+        } else if (rawCount === 0) {
+            filtered.unshift({
+                id: 'DEBUG_ERROR',
+                name: `[시스템 점검] 네이버 API에서 0건 리턴 (차단 가능성)`,
+                price: 0,
+                area: { m2: 0, pyeong: 0 },
+                link: '#',
+                dongName: '시스템',
+                note: 'High'
+            } as any);
+        }
 
         // 5. Send Telegram Notification (Async)
         (async () => {
