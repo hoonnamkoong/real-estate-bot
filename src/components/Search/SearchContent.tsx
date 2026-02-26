@@ -59,35 +59,12 @@ export function SearchContent({ initialData }: SearchContentProps) {
         try {
             // Fetch results from server action
             let results = await searchProperties(values);
-
-            if (results.length === 0) {
-                console.log('Search returned 0, adding mock to verify UI Table Rendering');
-                results = [{
-                    id: 'MOCK_VERIFY_1',
-                    name: 'UI 검증용 가상 매물 (잠실)',
-                    price: 250000,
-                    area: { m2: 132, pyeong: 40 },
-                    link: 'https://m.land.naver.com/',
-                    dongName: '잠실동',
-                    note: 'Mid'
-                }];
-            }
             setProperties(results);
 
             setSearchTime(dayjs().format('YYYY-MM-DD HH:mm:ss'));
             setLoadingMessage(null);
         } catch (error: any) {
             console.error('[handleSearch] Search failed:', error);
-            // Fallback to mock on error to verify table UI
-            setProperties([{
-                id: 'ERROR_VERIFY_1',
-                name: `에러 시 UI 검증용 (${error.message || 'Timeout'})`,
-                price: 200000,
-                area: { m2: 84, pyeong: 25 },
-                link: 'https://m.land.naver.com/',
-                dongName: '에러 복구 모드',
-                note: 'Low'
-            }]);
             setLoadingMessage(`에러 발생: ${error.message || 'Unknown'}`);
             setTimeout(() => setLoadingMessage(null), 5000);
         } finally {

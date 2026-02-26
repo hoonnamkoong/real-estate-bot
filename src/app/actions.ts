@@ -34,7 +34,7 @@ export async function searchProperties(data: FilterValues): Promise<Property[]> 
         const cortarNos = await Promise.all(regions.map(r => naverLand.getRegionCode(r)));
         console.log(`[searchProperties] Resolved codes: ${cortarNos}`);
 
-        // 3. Fetch from Naver with strict 8s timeout to beat Vercel Hobby 10s limit
+        // 3. Parallel Search across points to beat 10s timeout
         const priceMaxManWon = (data.priceMax || 0) * 10000;
         const criteria: SearchCriteria = {
             tradeType: data.tradeType as any,
@@ -43,42 +43,20 @@ export async function searchProperties(data: FilterValues): Promise<Property[]> 
             roomCount: data.roomCount || undefined,
         };
 
-        // Critical: For Vercel Hobby 10s limit, we take ONLY THE FIRST 1 point for Songpa
-        const isSongpa = regions.includes('songpa');
-        const searchCodes = isSongpa ? [cortarNos[0]] : cortarNos;
-
+        // 3. Parallel Search is handled internally by naverLand.getArticleList
         const fetchStart = Date.now();
+        const resultsArrays = await Promise.all(cortarNos.map(code =>
+            naverLand.getArticleList(code, criteria, true)
+        ));
 
-        const searchPromise = (async () => {
-            const resultsArrays = [];
-            for (const code of searchCodes) {
-                const subStart = Date.now();
-                const list = await naverLand.getArticleList(code, criteria, true);
-                console.log(`[searchProperties] Code ${code} fetch duration: ${Date.now() - subStart}ms, count=${list.length}`);
-                resultsArrays.push(list);
-                if (isSongpa) break;
-            }
-            return resultsArrays.flat();
-        })();
+        let results = resultsArrays.flat();
 
-        const timeoutPromise = new Promise<Property[]>((resolve) =>
-            setTimeout(() => {
-                console.log('[searchProperties] Timeout reached - returning fallback mock');
-                resolve([{
-                    id: 'TIMEOUT_FALLBACK_1',
-                    name: '검색 지연으로 인한 샘플 데이터 (송파)',
-                    price: 265000,
-                    area: { m2: 132, pyeong: 40 },
-                    link: 'https://m.land.naver.com/',
-                    dongName: '잠실동',
-                    note: 'Mid'
-                }]);
-            }, 8000)
-        );
+        // Remove duplicates safely using atclNo or id
+        const uniqueItems = Array.from(new Map(results.map(item => [((item as any).atclNo || item.id), item])).values());
+        results = uniqueItems;
 
-        const results = await Promise.race([searchPromise, timeoutPromise]);
         console.log(`[searchProperties] Finished with ${results.length} articles`);
-        console.log(`[searchProperties] Total fetch completed in ${Date.now() - fetchStart}ms, total articles: ${results.length}`);
+        console.log(`[searchProperties] Total fetch completed in ${Date.now() - fetchStart}ms`);
 
         // Special handling for Client-side chunking:
         // If results are incomplete or if it's a "heavy" region, we might want to tell the client to do more.

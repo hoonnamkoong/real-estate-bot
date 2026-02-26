@@ -17,10 +17,12 @@ export class NaverLandService {
     // Dong Coordinates Registry (Approximate Centers)
     private DONG_REGISTRY: Record<string, { name: string; lat: number; lon: number }[]> = {
         // --- GANGNAM 3-GU ---
-        '1171000000': [ // Songpa-gu (Minimal 3 points for Vercel Hobby 10s strict limit)
+        '1171000000': [ // Songpa-gu (Balanced for coverage vs performance)
             { name: '잠실/신천', lat: 37.512, lon: 127.090 },
-            { name: '가락/헬리오', lat: 37.496, lon: 127.110 },
-            { name: '문정/장지', lat: 37.483, lon: 127.122 }
+            { name: '방이/오금', lat: 37.510, lon: 127.125 },
+            { name: '가락/문정', lat: 37.492, lon: 127.125 },
+            { name: '거여/마천', lat: 37.495, lon: 127.145 },
+            { name: '풍납/잠실4,6', lat: 37.525, lon: 127.115 }
         ],
         '1168000000': [ // Gangnam-gu
             { name: '압구정1(구현대)', lat: 37.530, lon: 127.028 },
@@ -293,18 +295,13 @@ export class NaverLandService {
 
             if (this.DONG_REGISTRY[cortarNo]) {
                 searchPoints = this.DONG_REGISTRY[cortarNo];
-                if (isInteractive) {
-                    searchPoints = searchPoints.slice(0, 1);
-                    logger.info('NaverLandService', `FORCED 1 POINT for Vercel Hobby 10s limit`);
-                } else {
-                    logger.info('NaverLandService', `Using ${searchPoints.length} Known Dong Centers`);
-                }
+                logger.info('NaverLandService', `Using ${searchPoints.length} Known Dong Centers`);
             } else {
                 // Fallback: Grid
                 const { lat: centerLat, lon: centerLon } = this.getRegionCoords(cortarNo);
-                const gridSize = isInteractive ? 2 : 4;
-                const step = isInteractive ? 0.08 : 0.04;
-                const startOffset = isInteractive ? -0.04 : -0.06;
+                const gridSize = isInteractive ? 3 : 4;
+                const step = 0.04;
+                const startOffset = -0.06;
                 for (let i = 0; i < gridSize; i++) {
                     for (let j = 0; j < gridSize; j++) {
                         searchPoints.push({
@@ -314,7 +311,7 @@ export class NaverLandService {
                         });
                     }
                 }
-                logger.info('NaverLandService', `Using ${isInteractive ? '2x2' : '4x4'} Grid Search`);
+                logger.info('NaverLandService', `Using ${gridSize}x${gridSize} Grid Search`);
             }
 
             const fetchSubRegion = async (point: { name: string, lat: number, lon: number }) => {
