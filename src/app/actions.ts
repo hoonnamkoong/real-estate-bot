@@ -69,8 +69,12 @@ export async function searchProperties(data: FilterValues): Promise<Property[]> 
             while (Date.now() - proxyStart < 12000) {
                 const check = await prisma.searchJob.findUnique({ where: { id: job.id } });
                 if (check?.status === 'COMPLETED') {
-                    console.log(`[searchProperties] Job ${job.id} completed! length=${((check.result as any[]) || []).length}`);
-                    return (check.result as any[]) || [];
+                    const rawItems = (check.result as any[]) || [];
+                    console.log(`[searchProperties] Job ${job.id} completed! raw=${rawItems.length}`);
+                    // Map raw Naver API format (spc1, prc, atclNo) → Property format (area, price, id)
+                    const mapped = naverLand.mapNaverItemsToProperties(rawItems);
+                    console.log(`[searchProperties] Mapped to ${mapped.length} Property items`);
+                    return mapped;
                 }
                 if (check?.status === 'ERROR') {
                     throw new Error('안드로이드 프록시 측 검색 오류 발생');
