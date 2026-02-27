@@ -7,7 +7,7 @@ import { MantineProvider, ColorSchemeScript } from '@mantine/core';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: '부동산 봇 (Real Estate Bot)',
+  title: 'v2.0 - 부동산 봇 (Real Estate Bot)',
   description: 'Naver Real Estate Search & Notification Service',
 };
 
