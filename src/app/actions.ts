@@ -94,7 +94,7 @@ export async function searchProperties(data: FilterValues): Promise<Property[]> 
                 area: { m2: 0, pyeong: 0 },
                 link: '#',
                 dongName: '시스템',
-                note: 'High'
+                note: 'High' as any
             } as any];
         }
 
@@ -133,7 +133,7 @@ export async function searchProperties(data: FilterValues): Promise<Property[]> 
                 area: { m2: 0, pyeong: 0 },
                 link: '#',
                 dongName: '시스템',
-                note: 'Low'
+                note: 'Low' as any
             } as any);
         } else if (rawCount === 0) {
             filtered.unshift({
@@ -143,7 +143,7 @@ export async function searchProperties(data: FilterValues): Promise<Property[]> 
                 area: { m2: 0, pyeong: 0 },
                 link: '#',
                 dongName: '시스템',
-                note: 'High'
+                note: 'High' as any
             } as any);
         }
 
