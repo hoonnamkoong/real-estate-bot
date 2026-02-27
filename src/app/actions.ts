@@ -109,118 +109,94 @@ export async function searchProperties(data: FilterValues): Promise<Property[]> 
         // If results are incomplete or if it's a "heavy" region, we might want to tell the client to do more.
         // For now, we return what we found within the 5.5s limit.
 
-        // 4. Client-side Filtering
-        console.log(`[searchProperties] BEFORE_FILTER=${results.length}`);
+        // 4. No client-side filtering — Naver already filtered by prc and spc1 in the URL
+        // Just pass through all mapped results
+        console.log(`[searchProperties] Total results from Naver proxy: ${results.length}`);
+        const filtered = results.filter((item: any) => item && item.id !== 'TIMEOUT_ERR' ? true : item?.id === 'TIMEOUT_ERR');
 
-        const rawCount = results.length;
-        const filtered = results.filter((item: any) => {
-            if (!item) return false;
-            if (item.id === 'TIMEOUT_ERR') return true; // Let timeout error show up
+    } else if (rawCount === 0) {
+        filtered.unshift({
+            id: 'DEBUG_ERROR',
+            name: `[시스템 점검] 네이버 API에서 0건 리턴 (차단 가능성)`,
+            price: 0,
+            area: { m2: 0, pyeong: 0 },
+            link: '#',
+            dongName: '시스템',
+            note: 'High' as any
+        } as any);
+    }
 
-            if (!item.area) return false;
-
-            const itemPrice = Number(item._rawPrice || item.price);
-            const maxPrice = data.priceMax ? data.priceMax * 10000 : Infinity;
-
-            if (data.priceMax && itemPrice > maxPrice) return false;
-            if (data.areaMin && item.area.m2 < data.areaMin) return false;
-            return true;
-        });
-
-        // 5. Debug Info (Visible at the top for current session)
-        if (filtered.length === 0 && rawCount > 0) {
-            filtered.unshift({
-                id: 'DEBUG_INFO',
-                name: `[시스템 점검] 원천 데이터 ${rawCount}건 중 필터 조건 합치 0건`,
-                price: 0,
-                area: { m2: 0, pyeong: 0 },
-                link: '#',
-                dongName: '시스템',
-                note: 'Low' as any
-            } as any);
-        } else if (rawCount === 0) {
-            filtered.unshift({
-                id: 'DEBUG_ERROR',
-                name: `[시스템 점검] 네이버 API에서 0건 리턴 (차단 가능성)`,
-                price: 0,
-                area: { m2: 0, pyeong: 0 },
-                link: '#',
-                dongName: '시스템',
-                note: 'High' as any
-            } as any);
+    // 5. Send Telegram Notification (Async)
+    (async () => {
+        try {
+            // Updated: Save results to DB
+            const savedSettings = await prisma.searchSetting.create({
+                data: {
+                    regions: data.regions ? data.regions.join(',') : '',
+                    type: data.tradeType,
+                    priceMax: data.priceMax || null,
+                    areaMin: data.areaMin || null,
+                    areaMax: null,
+                    roomCount: data.roomCount || null,
+                    results: filtered.map((a: any) => ({
+                        id: String(a.atclNo),
+                        name: a.atclNm || 'Unknown',
+                        price: Number(a.prc) || 0,
+                        area: {
+                            m2: Number(a.spc1) || 0,
+                            pyeong: Math.round((Number(a.spc1) || 0) * 0.3025 * 10) / 10
+                        },
+                        link: `https://fintech-api.land.naver.com/v1/ad/article/${a.atclNo}`,
+                        dongName: a._dongName || '',
+                        note: (a.note as any) || undefined
+                    })) as any
+                } as any
+            });
+            console.log(`Saved search results snapshot with ID: ${savedSettings.id}`);
+        } catch (e) {
+            console.error('Non-critical DB save failure (Telegram/Snapshot):', e);
         }
 
-        // 5. Send Telegram Notification (Async)
-        (async () => {
-            try {
-                // Updated: Save results to DB
-                const savedSettings = await prisma.searchSetting.create({
-                    data: {
-                        regions: data.regions ? data.regions.join(',') : '',
-                        type: data.tradeType,
-                        priceMax: data.priceMax || null,
-                        areaMin: data.areaMin || null,
-                        areaMax: null,
-                        roomCount: data.roomCount || null,
-                        results: filtered.map((a: any) => ({
-                            id: String(a.atclNo),
-                            name: a.atclNm || 'Unknown',
-                            price: Number(a.prc) || 0,
-                            area: {
-                                m2: Number(a.spc1) || 0,
-                                pyeong: Math.round((Number(a.spc1) || 0) * 0.3025 * 10) / 10
-                            },
-                            link: `https://fintech-api.land.naver.com/v1/ad/article/${a.atclNo}`,
-                            dongName: a._dongName || '',
-                            note: (a.note as any) || undefined
-                        })) as any
-                    } as any
-                });
-                console.log(`Saved search results snapshot with ID: ${savedSettings.id}`);
-            } catch (e) {
-                console.error('Non-critical DB save failure (Telegram/Snapshot):', e);
+        try {
+            if (filtered.length === 0) {
+                await telegram.sendMessage(`📉 **[부동산 봇]**\n조건에 맞는 매물이 없습니다.\n지정된 구: ${data.regions.join(', ')}`);
+                return;
             }
 
-            try {
-                if (filtered.length === 0) {
-                    await telegram.sendMessage(`📉 **[부동산 봇]**\n조건에 맞는 매물이 없습니다.\n지정된 구: ${data.regions.join(', ')}`);
-                    return;
+            const header = `🏘 **[부동산 봇] 검색 결과 (${filtered.length}건)**\n조건: ${data.regions.join(', ')} ${data.priceMax}억 이하\n\n`;
+            let message = header;
+            const messages = [];
+
+            for (const item of filtered) {
+                const priceEok = Math.floor(item.price / 10000);
+                const priceMan = item.price % 10000;
+                const priceStr = priceEok > 0 ? `${priceEok}억` + (priceMan ? ` ${priceMan}` : '') : `${priceMan}만`;
+
+                const line = `🔹 <a href="${item.link}">${item.name}</a>\n   💰 ${priceStr} | ${item.area?.pyeong || '-'}평\n\n`;
+
+                if (message.length + line.length > 3500) { // Telegram 4096 limit
+                    messages.push(message);
+                    message = `(이어서)\n\n${line}`;
+                } else {
+                    message += line;
                 }
-
-                const header = `🏘 **[부동산 봇] 검색 결과 (${filtered.length}건)**\n조건: ${data.regions.join(', ')} ${data.priceMax}억 이하\n\n`;
-                let message = header;
-                const messages = [];
-
-                for (const item of filtered) {
-                    const priceEok = Math.floor(item.price / 10000);
-                    const priceMan = item.price % 10000;
-                    const priceStr = priceEok > 0 ? `${priceEok}억` + (priceMan ? ` ${priceMan}` : '') : `${priceMan}만`;
-
-                    const line = `🔹 <a href="${item.link}">${item.name}</a>\n   💰 ${priceStr} | ${item.area?.pyeong || '-'}평\n\n`;
-
-                    if (message.length + line.length > 3500) { // Telegram 4096 limit
-                        messages.push(message);
-                        message = `(이어서)\n\n${line}`;
-                    } else {
-                        message += line;
-                    }
-                }
-                messages.push(message);
-
-                for (const msg of messages) {
-                    await telegram.sendMessage(msg, 'HTML');
-                }
-            } catch (e) {
-                console.error('Failed to send telegram notification:', e);
             }
-        })();
+            messages.push(message);
 
-        return filtered;
-    } catch (error: any) {
-        console.error('[searchProperties] UNHANDLED ERROR:', error);
-        // CRITICAL: Return empty array instead of throwing to prevent Next.js RSC crash (HTML error page)
-        return [];
-    }
+            for (const msg of messages) {
+                await telegram.sendMessage(msg, 'HTML');
+            }
+        } catch (e) {
+            console.error('Failed to send telegram notification:', e);
+        }
+    })();
+
+    return filtered;
+} catch (error: any) {
+    console.error('[searchProperties] UNHANDLED ERROR:', error);
+    // CRITICAL: Return empty array instead of throwing to prevent Next.js RSC crash (HTML error page)
+    return [];
+}
 }
 
 export async function updatePropertyNote(id: string, note: string) {
