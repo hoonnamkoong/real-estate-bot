@@ -5,7 +5,7 @@ import { IconBuildingSkyscraper, IconSettings } from '@tabler/icons-react';
 
 export function Header() {
     return (
-        <header style={{ borderBottom: '1px solid #eee', backgroundColor: '#fff' }}>
+        <header style={{ borderBottom: '1px solid #eee', backgroundColor: '#ff0000' }}>
             <Container size="xl" py="md">
                 <Group justify="space-between">
                     <Group>
