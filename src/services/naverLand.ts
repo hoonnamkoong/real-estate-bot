@@ -294,7 +294,7 @@ export class NaverLandService {
      */
     generateProxyUrls(cortarNos: string[], criteria: SearchCriteria): string[] {
         const urls: string[] = [];
-        const subBoxSize = 0.04;
+        const subBoxSize = 0.05;
 
         for (const cortarNo of cortarNos) {
             let searchPoints: { name: string, lat: number, lon: number }[] = [];
