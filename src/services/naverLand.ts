@@ -338,6 +338,8 @@ export class NaverLandService {
                     params.append('page', String(page));
 
                     if (criteria.priceMax) params.append('prc', `0:${criteria.priceMax}`);
+                    if (criteria.areaMin) params.append('spc1From', String(Math.floor(criteria.areaMin)));
+                    if (criteria.areaMax) params.append('spc1To', String(Math.ceil(criteria.areaMax)));
 
                     const apiUrl = `${NAVER_LAND_MOBILE_HOST}/cluster/ajax/articleList?${params.toString()}`;
                     urls.push(apiUrl);
