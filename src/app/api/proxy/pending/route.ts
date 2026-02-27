@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
+export const dynamic = 'force-dynamic';
+export const maxDuration = 45;
+
 export async function GET() {
     try {
         const job = await prisma.searchJob.findFirst({

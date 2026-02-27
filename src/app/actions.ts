@@ -1,5 +1,7 @@
 'use server';
 
+export const maxDuration = 45; // Extend to 45 seconds for Vercel Hobby/Pro limit
+
 import { naverLand, SearchCriteria } from '@/services/naverLand';
 import { telegram } from '@/lib/telegram';
 import { prisma } from '@/lib/prisma'; // Need to create this if not exists, or use directly
@@ -46,24 +48,26 @@ export async function searchProperties(data: FilterValues): Promise<Property[]> 
         // 3. Parallel Search across points to beat 10s timeout
         const fetchStart = Date.now();
 
-        // Timeout promise: Return empty (or error info) after 8.5 seconds
+        // Timeout promise: Return empty (or error info) after 13.5 seconds
         const timeoutPromise = new Promise<Property[]>((_, reject) =>
-            setTimeout(() => reject(new Error('네이버 검색 서버 응답 지연 (8.5초 초과)')), 8500)
+            setTimeout(() => reject(new Error('네이버 검색 서버 응답 지연 (13.5초 초과)')), 13500)
         );
 
+        // Vercel Serverless maximum duration can be set if needed
         const searchPromise = (async () => {
             console.log(`[searchProperties] Creating SearchJob for APK Proxy`);
+            const urls = naverLand.generateProxyUrls(cortarNos, criteria);
             const job = await prisma.searchJob.create({
                 data: {
-                    params: { cortarNos, criteria },
+                    params: { cortarNos, criteria, urls },
                     status: 'PENDING'
                 }
             });
             console.log(`[searchProperties] Created Job ${job.id}, waiting for APK Proxy...`);
 
-            // Poll for completion (up to 8.0s to stay within Vercel execution limits)
+            // Poll for completion (up to 12.0s to stay mostly within Vercel execution limits but give max time)
             const proxyStart = Date.now();
-            while (Date.now() - proxyStart < 8000) {
+            while (Date.now() - proxyStart < 12000) {
                 const check = await prisma.searchJob.findUnique({ where: { id: job.id } });
                 if (check?.status === 'COMPLETED') {
                     console.log(`[searchProperties] Job ${job.id} completed! length=${((check.result as any[]) || []).length}`);
