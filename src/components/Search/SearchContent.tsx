@@ -169,7 +169,7 @@ export function SearchContent({ initialData }: SearchContentProps) {
                     {!searched && !loading && <Text c="dimmed" ta="center" py="xl">검색 조건을 입력하고 검색 버튼을 눌러주세요.</Text>}
 
                     <Text c="dimmed" size="xs" ta="center" mt="xl">
-                        Real Estate Bot v3.0-TS-20240227-1845 (Android Proxy Active)
+                        Real Estate Bot v3.0-TS-20240227-1855 (Android Proxy Active)
                     </Text>
                 </Box>
             </Stack>
