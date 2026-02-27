@@ -341,7 +341,9 @@ export class NaverLandService {
                     if (criteria.areaMin) params.append('spcMin', String(Math.floor(criteria.areaMin)));
                     if (criteria.areaMax) params.append('spcMax', String(Math.ceil(criteria.areaMax)));
 
+                    const apiUrl = `${NAVER_LAND_MOBILE_HOST}/cluster/ajax/articleList?${params.toString()}`;
                     urls.push(apiUrl);
+
                 }
             }
         }
