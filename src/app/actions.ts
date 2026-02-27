@@ -1,6 +1,5 @@
 'use server';
 
-export const maxDuration = 45; // Extend to 45 seconds for Vercel Hobby/Pro limit
 
 import { naverLand, SearchCriteria } from '@/services/naverLand';
 import { telegram } from '@/lib/telegram';
