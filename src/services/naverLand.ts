@@ -337,14 +337,10 @@ export class NaverLandService {
                     params.append('rgt', String(rgt.toFixed(7)));
                     params.append('page', String(page));
 
-                    if (criteria.priceMax) params.append('prc', `0:${criteria.priceMax}`);
-                    if (criteria.areaMin || criteria.areaMax) {
-                        const minSpc = criteria.areaMin ? Math.floor(criteria.areaMin) : 0;
-                        const maxSpc = criteria.areaMax ? Math.ceil(criteria.areaMax) : 9999;
-                        params.append('spc1', `${minSpc}:${maxSpc}`);
-                    }
+                    if (criteria.priceMax) params.append('dprcMax', String(criteria.priceMax));
+                    if (criteria.areaMin) params.append('spcMin', String(Math.floor(criteria.areaMin)));
+                    if (criteria.areaMax) params.append('spcMax', String(Math.ceil(criteria.areaMax)));
 
-                    const apiUrl = `${NAVER_LAND_MOBILE_HOST}/cluster/ajax/articleList?${params.toString()}`;
                     urls.push(apiUrl);
                 }
             }
