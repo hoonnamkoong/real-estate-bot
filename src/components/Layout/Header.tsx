@@ -12,7 +12,7 @@ export function Header() {
                         <ThemeIcon size="lg" radius="md" variant="filled" color="blue">
                             <IconBuildingSkyscraper size="1.2rem" />
                         </ThemeIcon>
-                        <Title order={3}>부동산 봇</Title>
+                        <Title order={3}>부동산 봇 (v1.2)</Title>
                     </Group>
 
                     <Group>

@@ -50,7 +50,7 @@ export async function searchProperties(data: FilterValues): Promise<Property[]> 
 
         // Timeout promise: Return empty (or error info) after 13.5 seconds
         const timeoutPromise = new Promise<Property[]>((_, reject) =>
-            setTimeout(() => reject(new Error('네이버 검색 서버 응답 지연 (13.5초 초과)')), 13500)
+            setTimeout(() => reject(new Error('네이버 검색 서버 응답 지연 (v1.2 - 13.5초 초과)')), 13500)
         );
 
         // Vercel Serverless maximum duration can be set if needed
@@ -59,7 +59,7 @@ export async function searchProperties(data: FilterValues): Promise<Property[]> 
             const urls = naverLand.generateProxyUrls(cortarNos, criteria);
             const job = await prisma.searchJob.create({
                 data: {
-                    params: { cortarNos, criteria, urls },
+                    params: { cortarNos, criteria, urls } as any,
                     status: 'PENDING'
                 }
             });
