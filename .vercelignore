@@ -1,0 +1,4 @@
+android-proxy-app
+.next
+node_modules
+*.log
