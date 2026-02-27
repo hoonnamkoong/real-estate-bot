@@ -31,5 +31,9 @@
     "postcss-simple-vars": "^7.0.1",
     "prisma": "^5.10.2",
     "typescript": "^5"
+  },
+  "overrides": {
+    "react": "19.0.0",
+    "react-dom": "19.0.0"
   }
 }
