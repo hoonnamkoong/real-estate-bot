@@ -449,376 +449,323 @@ export class NaverLandService {
     }
 
 
-    for(const cortarNo of cortarNos) {
-        let searchPoints: { name: string, lat: number, lon: number }[] = [];
-
-        if (this.DONG_REGISTRY[cortarNo]) {
-            searchPoints = this.DONG_REGISTRY[cortarNo];
-        } else {
-            const { lat: centerLat, lon: centerLon } = this.getRegionCoords(cortarNo);
-            const step = 0.04;
-            const startOffset = -0.06;
-            for (let i = 0; i < 4; i++) {
-                for (let j = 0; j < 4; j++) {
-                    searchPoints.push({
-                        name: `Grid_${i}_${j}`,
-                        lat: centerLat + startOffset + (i * step),
-                        lon: centerLon + startOffset + (j * step)
-                    });
-                }
-            }
-        }
-
-        for (const point of searchPoints) {
-            const { lat, lon } = point;
-            const btm = lat - subBoxSize;
-            const top = lat + subBoxSize;
-            const lft = lon - subBoxSize;
-            const rgt = lon + subBoxSize;
-
-            for (let page = 1; page <= 3; page++) {
-                const params = new URLSearchParams();
-                params.append('cortarNo', cortarNo);
-                params.append('rletTpCd', 'APT:ABYG:JGC');
-                params.append('tradTpCd', criteria.tradeType || 'A1');
-                params.append('z', '15');
-                params.append('lat', String(lat));
-                params.append('lon', String(lon));
-                params.append('btm', String(btm.toFixed(7)));
-                params.append('lft', String(lft.toFixed(7)));
-                params.append('top', String(top.toFixed(7)));
-                params.append('rgt', String(rgt.toFixed(7)));
-                params.append('page', String(page));
-
-                if (criteria.priceMax) params.append('dprcMax', String(criteria.priceMax));
-                if (criteria.areaMin) params.append('spcMin', String(Math.floor(criteria.areaMin)));
-                if (criteria.areaMax) params.append('spcMax', String(Math.ceil(criteria.areaMax)));
-
-                const apiUrl = `${NAVER_LAND_MOBILE_HOST}/cluster/ajax/articleList?${params.toString()}`;
-                urls.push(apiUrl);
-
-            }
-        }
-    }
-        return urls;
-    }
 
     /**
      * Get Article List using Direct API Fetch (No Puppeteer)
      */
     async getArticleList(cortarNo: string, criteria: SearchCriteria, isInteractive: boolean = false) {
-    logger.info('NaverLandService', 'Fetching Article List (Dong Search)', { cortarNo, criteria });
+        logger.info('NaverLandService', 'Fetching Article List (Dong Search)', { cortarNo, criteria });
 
-    try {
-        // Determine Search Points
-        // If Region is in Registry, use named Dongs.
-        // If not, use generic 4x4 Grid.
-        let searchPoints: { name: string, lat: number, lon: number }[] = [];
-        const subBoxSize = 0.04; // Increased for better coverage per point
+        try {
+            // Determine Search Points
+            // If Region is in Registry, use named Dongs.
+            // If not, use generic 4x4 Grid.
+            let searchPoints: { name: string, lat: number, lon: number }[] = [];
+            const subBoxSize = 0.04; // Increased for better coverage per point
 
-        if (this.DONG_REGISTRY[cortarNo]) {
-            searchPoints = this.DONG_REGISTRY[cortarNo];
-            logger.info('NaverLandService', `Using ${searchPoints.length} Known Dong Centers`);
-        } else {
-            // Fallback: Grid
-            const { lat: centerLat, lon: centerLon } = this.getRegionCoords(cortarNo);
-            const gridSize = isInteractive ? 3 : 4;
-            const step = 0.04;
-            const startOffset = -0.06;
-            for (let i = 0; i < gridSize; i++) {
-                for (let j = 0; j < gridSize; j++) {
-                    searchPoints.push({
-                        name: `Grid_${i}_${j}`,
-                        lat: centerLat + startOffset + (i * step),
-                        lon: centerLon + startOffset + (j * step)
-                    });
+            if (this.DONG_REGISTRY[cortarNo]) {
+                searchPoints = this.DONG_REGISTRY[cortarNo];
+                logger.info('NaverLandService', `Using ${searchPoints.length} Known Dong Centers`);
+            } else {
+                // Fallback: Grid
+                const { lat: centerLat, lon: centerLon } = this.getRegionCoords(cortarNo);
+                const gridSize = isInteractive ? 3 : 4;
+                const step = 0.04;
+                const startOffset = -0.06;
+                for (let i = 0; i < gridSize; i++) {
+                    for (let j = 0; j < gridSize; j++) {
+                        searchPoints.push({
+                            name: `Grid_${i}_${j}`,
+                            lat: centerLat + startOffset + (i * step),
+                            lon: centerLon + startOffset + (j * step)
+                        });
+                    }
+                }
+                logger.info('NaverLandService', `Using ${gridSize}x${gridSize} Grid Search`);
+            }
+
+            const fetchSubRegion = async (point: { name: string, lat: number, lon: number }) => {
+                const { lat, lon } = point;
+                const btm = lat - subBoxSize;
+                const top = lat + subBoxSize;
+                const lft = lon - subBoxSize;
+                const rgt = lon + subBoxSize;
+
+                const allSubItems: any[] = [];
+                const maxPages = 1; // Critical: Limit to 1 page for Vercel Hobby
+
+                for (let page = 1; page <= maxPages; page++) {
+                    const params = new URLSearchParams();
+                    params.append('cortarNo', cortarNo);
+                    params.append('rletTpCd', 'APT:ABYG:JGC');
+                    params.append('tradTpCd', criteria.tradeType || 'A1');
+                    params.append('z', '15'); // Better zoom level for cluster search
+                    params.append('lat', String(lat));
+                    params.append('lon', String(lon));
+                    params.append('btm', String(btm.toFixed(7)));
+                    params.append('lft', String(lft.toFixed(7)));
+                    params.append('top', String(top.toFixed(7)));
+                    params.append('rgt', String(rgt.toFixed(7)));
+                    params.append('page', String(page));
+
+                    if (criteria.priceMax) params.append('prc', `0:${criteria.priceMax}`);
+                    // spcMin and rom removed from API params to simplify request
+
+                    const apiUrl = `${NAVER_LAND_MOBILE_HOST}/cluster/ajax/articleList?${params.toString()}`;
+
+                    try {
+                        const controller = new AbortController();
+                        const timeoutId = setTimeout(() => controller.abort(), 4500); // Give enough time for direct call
+
+                        const response = await fetch(apiUrl, {
+                            cache: 'no-store',
+                            signal: controller.signal as any,
+                            headers: {
+                                'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
+                                'Referer': 'https://m.land.naver.com/'
+                            }
+                        });
+                        clearTimeout(timeoutId);
+                        if (!response.ok) break;
+                        const json = await response.json();
+                        const items = Array.isArray(json.body) ? json.body : [];
+
+                        if (items.length === 0) break; // Stop if no items
+
+                        allSubItems.push(...items.map((item: any) => ({
+                            ...item,
+                            // Use mapped name from item's cortarNo if available, otherwise fallback to search point name
+                            _dongName: this.DONG_CODE_MAP[item.cortarNo] || point.name
+                        })));
+
+                        // Optimization: If fewer than 20 items returned, it's the last page
+                        if (items.length < 20) break;
+
+                    } catch (e) {
+                        logger.error('NaverLandService', `Sub-region Fetch Error (Page ${page})`, { error: e });
+                        break;
+                    }
+                }
+                return allSubItems;
+            };
+
+            // Parallel execute with safer 7.5s internal limit for Vercel Hobby
+            const startTime = Date.now();
+            const MAX_MS = 7500; // Allow more time for individual point fetches
+
+            console.log(`[NaverLandService] Fetching ${searchPoints.length} points with concurrency limit (Batch size: 4)...`);
+
+            const resultsArrays: any[][] = [];
+            const CONCURRENCY = 2; // Reduce to avoid triggering naive rate limits
+
+            for (let i = 0; i < searchPoints.length; i += CONCURRENCY) {
+                const batch = searchPoints.slice(i, i + CONCURRENCY);
+                const batchStart = Date.now();
+
+                const batchResults = await Promise.all(
+                    batch.map(async (point, localIdx) => {
+                        const idx = i + localIdx;
+                        const elapsed = Date.now() - startTime;
+
+                        if (isInteractive && (elapsed > MAX_MS)) {
+                            console.warn(`[NaverLandService] SKIP: Point #${idx} (${point.name}) at ${elapsed}ms due to limit`);
+                            return [];
+                        }
+
+                        try {
+                            const pStart = Date.now();
+                            const list = await fetchSubRegion(point);
+                            console.log(`[NaverLandService] DONE: Point #${idx} (${point.name}) in ${Date.now() - pStart}ms, items=${list.length}`);
+                            return list;
+                        } catch (e) {
+                            return [];
+                        }
+                    })
+                );
+                resultsArrays.push(...batchResults);
+
+                // If we've already exceeded our target time and are interactive, break early
+                if (isInteractive && (Date.now() - startTime >= MAX_MS)) {
+                    console.log(`[NaverLandService] Breaking out of batch loop early to respect interactive timeout.`);
+                    break;
                 }
             }
-            logger.info('NaverLandService', `Using ${gridSize}x${gridSize} Grid Search`);
+
+            const results = resultsArrays.flat();
+
+            const allItems = results.flat();
+            return this.mapNaverItemsToProperties(allItems);
+
+        } catch (error) {
+            logger.error('NaverLandService', 'API Fetch Failed', { error });
+            return [];
         }
+    }
 
-        const fetchSubRegion = async (point: { name: string, lat: number, lon: number }) => {
-            const { lat, lon } = point;
-            const btm = lat - subBoxSize;
-            const top = lat + subBoxSize;
-            const lft = lon - subBoxSize;
-            const rgt = lon + subBoxSize;
+    /**
+     * Parse raw Naver items (from Android Proxy) into Property array
+     */
+    mapNaverItemsToProperties(allItems: any[]): Property[] {
+        const uniqueMap = new Map();
 
-            const allSubItems: any[] = [];
-            const maxPages = 1; // Critical: Limit to 1 page for Vercel Hobby
+        allItems.forEach((item: any) => {
+            if (!uniqueMap.has(item.atclNo)) {
+                // Keep track of dongName if injected by proxy, else use DONG_CODE_MAP
+                const dongName = item._dongName || this.DONG_CODE_MAP[item.cortarNo] || '-';
+                uniqueMap.set(item.atclNo, { ...item, _dongName: dongName });
+            }
+        });
 
-            for (let page = 1; page <= maxPages; page++) {
-                const params = new URLSearchParams();
-                params.append('cortarNo', cortarNo);
-                params.append('rletTpCd', 'APT:ABYG:JGC');
-                params.append('tradTpCd', criteria.tradeType || 'A1');
-                params.append('z', '15'); // Better zoom level for cluster search
-                params.append('lat', String(lat));
-                params.append('lon', String(lon));
-                params.append('btm', String(btm.toFixed(7)));
-                params.append('lft', String(lft.toFixed(7)));
-                params.append('top', String(top.toFixed(7)));
-                params.append('rgt', String(rgt.toFixed(7)));
-                params.append('page', String(page));
+        const uniqueList = Array.from(uniqueMap.values());
 
-                if (criteria.priceMax) params.append('prc', `0:${criteria.priceMax}`);
-                // spcMin and rom removed from API params to simplify request
+        const articles = uniqueList.map((item: any) => {
+            const spc1 = typeof item.spc1 === 'string' ? parseFloat(item.spc1) : (Number(item.spc1) || 0);
+            const price = typeof item.prc === 'number' ? item.prc : (parseInt(item.prc) || 0);
 
-                const apiUrl = `${NAVER_LAND_MOBILE_HOST}/cluster/ajax/articleList?${params.toString()}`;
+            return {
+                id: String(item.atclNo || Math.random().toString(36).substr(2, 9)),
+                name: item.atclNm || 'Unknown Property',
+                price: price,
+                households: 0,
+                area: {
+                    m2: spc1,
+                    pyeong: spc1 > 0 ? Math.round(spc1 / 3.3058) : 0
+                },
+                link: item.atclNo ? `https://m.land.naver.com/article/info/${item.atclNo}` : '#',
+                note: undefined,
+                _rawPrice: price,
+                dongName: item._dongName || '-'
+            };
+        });
 
-                try {
-                    const controller = new AbortController();
-                    const timeoutId = setTimeout(() => controller.abort(), 4500); // Give enough time for direct call
+        articles.sort((a, b) => {
+            const dongA = a.dongName || '';
+            const dongB = b.dongName || '';
+            if (dongA !== dongB) {
+                return dongA.localeCompare(dongB);
+            }
+            return a.price - b.price;
+        });
+
+        return articles;
+    }
+
+    /**
+     * Get Total Number of Points for a region
+     */
+    getPointCount(regionCode: string): number {
+        return this.DONG_REGISTRY[regionCode]?.length || 0;
+    }
+
+    /**
+     * Get Article List for a specific chunk (range of points)
+     */
+    async getArticleListByChunk(regionCode: string, criteria: SearchCriteria, startIndex: number, endIndex: number): Promise<Property[]> {
+        const allPoints = this.DONG_REGISTRY[regionCode] || [];
+        const searchPoints = allPoints.slice(startIndex, endIndex);
+
+        if (searchPoints.length === 0) return [];
+
+        console.log(`[NaverLandService] Fetching chunk [${startIndex}-${endIndex}] for ${regionCode} (${searchPoints.length} points)`);
+
+        try {
+            const fetchSubRegion = async (point: { name: string; lat: number; lon: number }) => {
+                let allSubItems: any[] = [];
+                for (let page = 1; page <= 2; page++) {
+                    const params = new URLSearchParams({
+                        reitId: '', rletTpCd: 'OPST:APT:JGC:ABYG', tradTpCd: criteria.tradeType || 'A1',
+                        z: '15', lat: String(point.lat), lon: String(point.lon),
+                        btm: String(point.lat - 0.01), lft: String(point.lon - 0.01),
+                        top: String(point.lat + 0.01), rgt: String(point.lon + 0.01),
+                        pgr: String(page), cortNo: regionCode
+                    });
+
+                    if (criteria.priceMax) params.append('prc', `0:${criteria.priceMax}`);
+                    if (criteria.areaMin) params.append('spcMin', String(criteria.areaMin));
+                    if (criteria.roomCount) params.append('rom', String(criteria.roomCount));
+
+                    const apiUrl = `${NAVER_LAND_MOBILE_HOST}/cluster/ajax/articleList?${params.toString()}`;
 
                     const response = await fetch(apiUrl, {
-                        cache: 'no-store',
-                        signal: controller.signal as any,
                         headers: {
                             'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
                             'Referer': 'https://m.land.naver.com/'
                         }
                     });
-                    clearTimeout(timeoutId);
                     if (!response.ok) break;
                     const json = await response.json();
                     const items = Array.isArray(json.body) ? json.body : [];
-
-                    if (items.length === 0) break; // Stop if no items
+                    if (items.length === 0) {
+                        // If center of point has no results, don't stop entire point search, 
+                        // but maybe current coordinates don't have matching filter.
+                        // However, since we use clustering, usually page 1 has something if it exists.
+                        // We continue instead of break to allow other searchPoints in the chunk.
+                        break;
+                    }
 
                     allSubItems.push(...items.map((item: any) => ({
                         ...item,
-                        // Use mapped name from item's cortarNo if available, otherwise fallback to search point name
                         _dongName: this.DONG_CODE_MAP[item.cortarNo] || point.name
                     })));
-
-                    // Optimization: If fewer than 20 items returned, it's the last page
                     if (items.length < 20) break;
-
-                } catch (e) {
-                    logger.error('NaverLandService', `Sub-region Fetch Error (Page ${page})`, { error: e });
-                    break;
                 }
-            }
-            return allSubItems;
-        };
+                return allSubItems;
+            };
 
-        // Parallel execute with safer 7.5s internal limit for Vercel Hobby
-        const startTime = Date.now();
-        const MAX_MS = 7500; // Allow more time for individual point fetches
-
-        console.log(`[NaverLandService] Fetching ${searchPoints.length} points with concurrency limit (Batch size: 4)...`);
-
-        const resultsArrays: any[][] = [];
-        const CONCURRENCY = 2; // Reduce to avoid triggering naive rate limits
-
-        for (let i = 0; i < searchPoints.length; i += CONCURRENCY) {
-            const batch = searchPoints.slice(i, i + CONCURRENCY);
-            const batchStart = Date.now();
-
-            const batchResults = await Promise.all(
-                batch.map(async (point, localIdx) => {
-                    const idx = i + localIdx;
-                    const elapsed = Date.now() - startTime;
-
-                    if (isInteractive && (elapsed > MAX_MS)) {
-                        console.warn(`[NaverLandService] SKIP: Point #${idx} (${point.name}) at ${elapsed}ms due to limit`);
-                        return [];
-                    }
-
+            const resultsArrays = await Promise.all(
+                searchPoints.map(async (point) => {
                     try {
-                        const pStart = Date.now();
-                        const list = await fetchSubRegion(point);
-                        console.log(`[NaverLandService] DONE: Point #${idx} (${point.name}) in ${Date.now() - pStart}ms, items=${list.length}`);
-                        return list;
+                        return await fetchSubRegion(point);
                     } catch (e) {
                         return [];
                     }
                 })
             );
-            resultsArrays.push(...batchResults);
 
-            // If we've already exceeded our target time and are interactive, break early
-            if (isInteractive && (Date.now() - startTime >= MAX_MS)) {
-                console.log(`[NaverLandService] Breaking out of batch loop early to respect interactive timeout.`);
-                break;
-            }
-        }
-
-        const results = resultsArrays.flat();
-
-        const allItems = results.flat();
-        return this.mapNaverItemsToProperties(allItems);
-
-    } catch (error) {
-        logger.error('NaverLandService', 'API Fetch Failed', { error });
-        return [];
-    }
-}
-
-/**
- * Parse raw Naver items (from Android Proxy) into Property array
- */
-mapNaverItemsToProperties(allItems: any[]): Property[] {
-    const uniqueMap = new Map();
-
-    allItems.forEach((item: any) => {
-        if (!uniqueMap.has(item.atclNo)) {
-            // Keep track of dongName if injected by proxy, else use DONG_CODE_MAP
-            const dongName = item._dongName || this.DONG_CODE_MAP[item.cortarNo] || '-';
-            uniqueMap.set(item.atclNo, { ...item, _dongName: dongName });
-        }
-    });
-
-    const uniqueList = Array.from(uniqueMap.values());
-
-    const articles = uniqueList.map((item: any) => {
-        const spc1 = typeof item.spc1 === 'string' ? parseFloat(item.spc1) : (Number(item.spc1) || 0);
-        const price = typeof item.prc === 'number' ? item.prc : (parseInt(item.prc) || 0);
-
-        return {
-            id: String(item.atclNo || Math.random().toString(36).substr(2, 9)),
-            name: item.atclNm || 'Unknown Property',
-            price: price,
-            households: 0,
-            area: {
-                m2: spc1,
-                pyeong: spc1 > 0 ? Math.round(spc1 / 3.3058) : 0
-            },
-            link: item.atclNo ? `https://m.land.naver.com/article/info/${item.atclNo}` : '#',
-            note: undefined,
-            _rawPrice: price,
-            dongName: item._dongName || '-'
-        };
-    });
-
-    articles.sort((a, b) => {
-        const dongA = a.dongName || '';
-        const dongB = b.dongName || '';
-        if (dongA !== dongB) {
-            return dongA.localeCompare(dongB);
-        }
-        return a.price - b.price;
-    });
-
-    return articles;
-}
-
-/**
- * Get Total Number of Points for a region
- */
-getPointCount(regionCode: string): number {
-    return this.DONG_REGISTRY[regionCode]?.length || 0;
-}
-
-    /**
-     * Get Article List for a specific chunk (range of points)
-     */
-    async getArticleListByChunk(regionCode: string, criteria: SearchCriteria, startIndex: number, endIndex: number): Promise < Property[] > {
-    const allPoints = this.DONG_REGISTRY[regionCode] || [];
-    const searchPoints = allPoints.slice(startIndex, endIndex);
-
-    if(searchPoints.length === 0) return [];
-
-    console.log(`[NaverLandService] Fetching chunk [${startIndex}-${endIndex}] for ${regionCode} (${searchPoints.length} points)`);
-
-    try {
-        const fetchSubRegion = async (point: { name: string; lat: number; lon: number }) => {
-            let allSubItems: any[] = [];
-            for (let page = 1; page <= 2; page++) {
-                const params = new URLSearchParams({
-                    reitId: '', rletTpCd: 'OPST:APT:JGC:ABYG', tradTpCd: criteria.tradeType || 'A1',
-                    z: '15', lat: String(point.lat), lon: String(point.lon),
-                    btm: String(point.lat - 0.01), lft: String(point.lon - 0.01),
-                    top: String(point.lat + 0.01), rgt: String(point.lon + 0.01),
-                    pgr: String(page), cortNo: regionCode
-                });
-
-                if (criteria.priceMax) params.append('prc', `0:${criteria.priceMax}`);
-                if (criteria.areaMin) params.append('spcMin', String(criteria.areaMin));
-                if (criteria.roomCount) params.append('rom', String(criteria.roomCount));
-
-                const apiUrl = `${NAVER_LAND_MOBILE_HOST}/cluster/ajax/articleList?${params.toString()}`;
-
-                const response = await fetch(apiUrl, {
-                    headers: {
-                        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
-                        'Referer': 'https://m.land.naver.com/'
-                    }
-                });
-                if (!response.ok) break;
-                const json = await response.json();
-                const items = Array.isArray(json.body) ? json.body : [];
-                if (items.length === 0) {
-                    // If center of point has no results, don't stop entire point search, 
-                    // but maybe current coordinates don't have matching filter.
-                    // However, since we use clustering, usually page 1 has something if it exists.
-                    // We continue instead of break to allow other searchPoints in the chunk.
-                    break;
+            const allItems = resultsArrays.flat();
+            const uniqueMap = new Map();
+            allItems.forEach((item: any) => {
+                if (!uniqueMap.has(item.atclNo)) {
+                    uniqueMap.set(item.atclNo, item);
                 }
+            });
 
-                allSubItems.push(...items.map((item: any) => ({
-                    ...item,
-                    _dongName: this.DONG_CODE_MAP[item.cortarNo] || point.name
-                })));
-                if (items.length < 20) break;
-            }
-            return allSubItems;
-        };
-
-        const resultsArrays = await Promise.all(
-            searchPoints.map(async (point) => {
-                try {
-                    return await fetchSubRegion(point);
-                } catch (e) {
-                    return [];
-                }
-            })
-        );
-
-        const allItems = resultsArrays.flat();
-        const uniqueMap = new Map();
-        allItems.forEach((item: any) => {
-            if (!uniqueMap.has(item.atclNo)) {
-                uniqueMap.set(item.atclNo, item);
-            }
-        });
-
-        return Array.from(uniqueMap.values()).map((item: any) => {
-            const spc1 = typeof item.spc1 === 'string' ? parseFloat(item.spc1) : (Number(item.spc1) || 0);
-            const price = typeof item.prc === 'number' ? item.prc : (parseInt(item.prc) || 0);
-            return {
-                id: String(item.atclNo),
-                name: item.atclNm || 'Unknown',
-                price: price,
-                households: 0,
-                area: { m2: spc1, pyeong: spc1 > 0 ? Math.round(spc1 / 3.3058) : 0 },
-                link: `https://m.land.naver.com/article/info/${item.atclNo}`,
-                _rawPrice: price,
-                dongName: item._dongName || '-'
-            };
-        });
-    } catch(e) {
-        console.error('getArticleListByChunk Error', e);
-        return [];
+            return Array.from(uniqueMap.values()).map((item: any) => {
+                const spc1 = typeof item.spc1 === 'string' ? parseFloat(item.spc1) : (Number(item.spc1) || 0);
+                const price = typeof item.prc === 'number' ? item.prc : (parseInt(item.prc) || 0);
+                return {
+                    id: String(item.atclNo),
+                    name: item.atclNm || 'Unknown',
+                    price: price,
+                    households: 0,
+                    area: { m2: spc1, pyeong: spc1 > 0 ? Math.round(spc1 / 3.3058) : 0 },
+                    link: `https://m.land.naver.com/article/info/${item.atclNo}`,
+                    _rawPrice: price,
+                    dongName: item._dongName || '-'
+                };
+            });
+        } catch (e) {
+            console.error('getArticleListByChunk Error', e);
+            return [];
+        }
     }
-}
 
     /**
      * Get Region Code (CortarNo)
      */
-    async getRegionCode(keyword: string): Promise < string > {
-    const map: Record<string, string> = {
-    'gangnam': '1168000000', 'seocho': '1165000000', 'songpa': '1171000000',
-        'yongsan': '1117000000', 'seongdong': '1120000000', 'gwangjin': '1121500000',
+    async getRegionCode(keyword: string): Promise<string> {
+        const map: Record<string, string> = {
+            'gangnam': '1168000000', 'seocho': '1165000000', 'songpa': '1171000000',
+            'yongsan': '1117000000', 'seongdong': '1120000000', 'gwangjin': '1121500000',
             'mapo': '1144000000', 'yangcheon': '1147000000', 'yeongdeungpo': '1156000000',
-                'gangdong': '1174000000', 'jongno': '1111000000', 'junggu': '1114000000',
-                    'dongdaemun': '1123000000', 'jungnang': '1126000000', 'seongbuk': '1129000000',
-                        'gangbuk': '1130500000', 'dobong': '1132000000', 'nowon': '1135000000',
-                            'eunpyeong': '1138000000', 'seodaemun': '1141000000', 'gangseo': '1150000000',
-                                'guro': '1153000000', 'geumcheon': '1154500000', 'dongjak': '1159000000',
-                                    'gwanak': '1162000000'
-};
-return map[keyword] || '1168000000';
+            'gangdong': '1174000000', 'jongno': '1111000000', 'junggu': '1114000000',
+            'dongdaemun': '1123000000', 'jungnang': '1126000000', 'seongbuk': '1129000000',
+            'gangbuk': '1130500000', 'dobong': '1132000000', 'nowon': '1135000000',
+            'eunpyeong': '1138000000', 'seodaemun': '1141000000', 'gangseo': '1150000000',
+            'guro': '1153000000', 'geumcheon': '1154500000', 'dongjak': '1159000000',
+            'gwanak': '1162000000'
+        };
+        return map[keyword] || '1168000000';
     }
 }
 
