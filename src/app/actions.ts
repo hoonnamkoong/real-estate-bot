@@ -49,7 +49,7 @@ export async function searchProperties(data: FilterValues): Promise<Property[]> 
 
         // Timeout promise: Return empty (or error info) after 13.5 seconds
         const timeoutPromise = new Promise<Property[]>((_, reject) =>
-            setTimeout(() => reject(new Error('네이버 검색 서버 응답 지연 (v1.2 - 13.5초 초과)')), 13500)
+            setTimeout(() => reject(new Error('네이버 검색 서버 응답 지연 (50초 초과)')), 50000)
         );
 
         // Vercel Serverless maximum duration can be set if needed
@@ -66,7 +66,7 @@ export async function searchProperties(data: FilterValues): Promise<Property[]> 
 
             // Poll for completion (up to 12.0s to stay mostly within Vercel execution limits but give max time)
             const proxyStart = Date.now();
-            while (Date.now() - proxyStart < 12000) {
+            while (Date.now() - proxyStart < 48000) {
                 const check = await prisma.searchJob.findUnique({ where: { id: job.id } });
                 if (check?.status === 'COMPLETED') {
                     const rawItems = (check.result as any[]) || [];

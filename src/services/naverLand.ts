@@ -314,23 +314,25 @@ export class NaverLandService {
                 const lft = lon - subBoxSize;
                 const rgt = lon + subBoxSize;
 
-                const params = new URLSearchParams();
-                params.append('cortarNo', cortarNo);
-                params.append('rletTpCd', 'APT:ABYG:JGC');
-                params.append('tradTpCd', criteria.tradeType || 'A1');
-                params.append('z', '15');
-                params.append('lat', String(lat));
-                params.append('lon', String(lon));
-                params.append('btm', String(btm.toFixed(7)));
-                params.append('lft', String(lft.toFixed(7)));
-                params.append('top', String(top.toFixed(7)));
-                params.append('rgt', String(rgt.toFixed(7)));
-                params.append('page', '1');
+                for (let page = 1; page <= 3; page++) {
+                    const params = new URLSearchParams();
+                    params.append('cortarNo', cortarNo);
+                    params.append('rletTpCd', 'APT:ABYG:JGC');
+                    params.append('tradTpCd', criteria.tradeType || 'A1');
+                    params.append('z', '15');
+                    params.append('lat', String(lat));
+                    params.append('lon', String(lon));
+                    params.append('btm', String(btm.toFixed(7)));
+                    params.append('lft', String(lft.toFixed(7)));
+                    params.append('top', String(top.toFixed(7)));
+                    params.append('rgt', String(rgt.toFixed(7)));
+                    params.append('page', String(page));
 
-                if (criteria.priceMax) params.append('prc', `0:${criteria.priceMax}`);
+                    if (criteria.priceMax) params.append('prc', `0:${criteria.priceMax}`);
 
-                const apiUrl = `${NAVER_LAND_MOBILE_HOST}/cluster/ajax/articleList?${params.toString()}`;
-                urls.push(apiUrl);
+                    const apiUrl = `${NAVER_LAND_MOBILE_HOST}/cluster/ajax/articleList?${params.toString()}`;
+                    urls.push(apiUrl);
+                }
             }
         }
         return urls;
