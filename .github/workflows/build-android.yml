@@ -28,7 +28,7 @@ jobs:
 
       - name: Expo Prebuild
         working-directory: ./android-proxy-app
-        run: npx expo prebuild --platform android
+        run: npx expo prebuild --platform android --no-install
 
       - name: Set Execute Permissions for gradlew
         working-directory: ./android-proxy-app/android
