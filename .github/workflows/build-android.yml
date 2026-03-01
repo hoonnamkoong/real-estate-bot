@@ -30,6 +30,11 @@ jobs:
         working-directory: ./android-proxy-app
         run: npx expo prebuild --platform android --no-install
 
+      - name: Pin Gradle to 8.6 (expo 52 compatible)
+        working-directory: ./android-proxy-app/android
+        run: |
+          sed -i 's|distributionUrl=.*|distributionUrl=https\\://services.gradle.org/distributions/gradle-8.6-all.zip|' gradle/wrapper/gradle-wrapper.properties
+
       - name: Set Execute Permissions for gradlew
         working-directory: ./android-proxy-app/android
         run: chmod +x gradlew
