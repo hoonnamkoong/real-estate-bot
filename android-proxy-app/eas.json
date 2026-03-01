@@ -1,6 +1,7 @@
 {
     "build": {
         "preview": {
+            "requiresExpoDoctor": false,
             "android": {
                 "buildType": "apk"
             }
