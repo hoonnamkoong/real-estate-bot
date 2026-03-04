@@ -58,7 +58,7 @@ export async function searchProperties(data: FilterValues): Promise<Property[]> 
             const urls = naverLand.generateProxyUrls(cortarNos, criteria);
 
             // Trigger Android Phone via Join Webhook to wake up and run the app
-            const webhookUrl = process.env.JOIN_WEBHOOK_URL || 'https://joinjoaomgcd.appspot.com/_ah/api/messaging/v1/sendPush?apikey=7be997298cbd43c98224188653634155&deviceId=2914080424af4b78acab862f02787791&text=run_proxy';
+            const webhookUrl = process.env.JOIN_WEBHOOK_URL || 'https://joinjoaomgcd.appspot.com/_ah/api/messaging/v1/sendPush?apikey=f78d04c55f3c4d378233c629a08cc669&text=run_proxy&deviceId=2914080424af4b78acab862f02787791';
             console.log(`[searchProperties] Triggering phone via Join Webhook...`);
             fetch(webhookUrl).catch(e => console.error('Join Webhook failed:', e));
 
