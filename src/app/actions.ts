@@ -136,7 +136,13 @@ export async function searchProperties(data: FilterValues): Promise<Property[]> 
         // 4. No client-side filtering — Naver already filtered by prc and spc1 in the URL
         // Just pass through all mapped results
         console.log(`[searchProperties] Total results from Naver proxy: ${results.length}`);
-        const filtered = results.filter((item: any) => item && item.id !== 'TIMEOUT_ERR' ? true : item?.id === 'TIMEOUT_ERR');
+        let filtered = results.filter((item: any) => item && item.id !== 'TIMEOUT_ERR' ? true : item?.id === 'TIMEOUT_ERR');
+
+        // 동별 정렬 (Sort by dongName)
+        filtered.sort((a, b) => {
+            if (!a.dongName || !b.dongName) return 0;
+            return a.dongName.localeCompare(b.dongName);
+        });
 
 
         // 5. Send Telegram Notification (Async)
