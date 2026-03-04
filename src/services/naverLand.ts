@@ -413,7 +413,7 @@ export class NaverLandService {
                         params.append('rgt', String(rgt.toFixed(7)));
                         params.append('page', String(page));
 
-                        if (criteria.priceMax) params.append('dealPrcMax', String(criteria.priceMax));
+                        if (criteria.priceMax) params.append('dprcMax', String(criteria.priceMax));
                         if (criteria.areaMin) params.append('spcMin', String(Math.floor(criteria.areaMin)));
                         if (criteria.areaMax) params.append('spcMax', String(Math.ceil(criteria.areaMax)));
                         if (criteria.roomCount && criteria.roomCount >= 4) params.append('tag', 'FOURROOM');
@@ -438,7 +438,7 @@ export class NaverLandService {
                     params.append('top', String((lat + 0.08).toFixed(7)));
                     params.append('rgt', String((lon + 0.08).toFixed(7)));
                     params.append('page', String(page));
-                    if (criteria.priceMax) params.append('dealPrcMax', String(criteria.priceMax));
+                    if (criteria.priceMax) params.append('dprcMax', String(criteria.priceMax));
                     if (criteria.areaMin) params.append('spcMin', String(Math.floor(criteria.areaMin)));
                     if (criteria.roomCount && criteria.roomCount >= 4) params.append('tag', 'FOURROOM');
                     urls.push(`${NAVER_LAND_MOBILE_HOST}/cluster/ajax/articleList?${params.toString()}`);
