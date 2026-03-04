@@ -17,9 +17,11 @@ export async function GET() {
         });
 
         let latestResultCount = -1;
+        let sampleItem = null;
         if (latestCompleted && latestCompleted.result) {
             const resArr = latestCompleted.result as any[];
             latestResultCount = Array.isArray(resArr) ? resArr.length : -2;
+            if (Array.isArray(resArr) && resArr.length > 0) sampleItem = resArr[0];
         }
 
         return NextResponse.json({
@@ -27,7 +29,8 @@ export async function GET() {
             jobs,
             latestCompletedInfo: {
                 id: latestCompleted?.id,
-                count: latestResultCount
+                count: latestResultCount,
+                sampleItem
             }
         });
     } catch (e: any) {
