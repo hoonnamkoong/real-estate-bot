@@ -384,22 +384,15 @@ export class NaverLandService {
      */
     generateProxyUrls(cortarNos: string[], criteria: SearchCriteria): string[] {
         const urls: string[] = [];
-        const NAVER_LAND_PC_API = 'https://new.land.naver.com/api/articles';
+        // [Step 1 of Two-Step Proxy] Extract Complex List
+        const NAVER_LAND_PC_COMPLEX_API = 'https://new.land.naver.com/api/regions/complexes';
 
         for (const cortarNo of cortarNos) {
-            // PC API parameters
             const params = new URLSearchParams();
             params.append('cortarNo', cortarNo);
             params.append('rletTpCd', 'APT:ABYG:JGC');
             params.append('tradTpCd', criteria.tradeType || 'A1');
-            params.append('page', '1');
-
-            if (criteria.priceMax) params.append('priceMax', String(criteria.priceMax));
-            if (criteria.areaMin) params.append('areaMin', String(Math.floor(criteria.areaMin)));
-            if (criteria.areaMax) params.append('areaMax', String(Math.ceil(criteria.areaMax)));
-            if (criteria.roomCount && criteria.roomCount >= 4) params.append('tag', 'FOURROOM');
-
-            urls.push(`${NAVER_LAND_PC_API}?${params.toString()}`);
+            urls.push(`${NAVER_LAND_PC_COMPLEX_API}?${params.toString()}`);
         }
         return urls;
     }
