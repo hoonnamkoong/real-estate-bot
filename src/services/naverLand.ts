@@ -384,15 +384,56 @@ export class NaverLandService {
      */
     generateProxyUrls(cortarNos: string[], criteria: SearchCriteria): string[] {
         const urls: string[] = [];
-        // [Step 1 of Two-Step Proxy] Extract Complex List
-        const NAVER_LAND_PC_COMPLEX_API = 'https://new.land.naver.com/api/regions/complexes';
+        const NAVER_LAND_PC_BBOX_API = 'https://new.land.naver.com/api/articles';
 
         for (const cortarNo of cortarNos) {
-            const params = new URLSearchParams();
-            params.append('cortarNo', cortarNo);
-            params.append('rletTpCd', 'APT:ABYG:JGC');
-            params.append('tradTpCd', criteria.tradeType || 'A1');
-            urls.push(`${NAVER_LAND_PC_COMPLEX_API}?${params.toString()}`);
+            let searchPoints: { name: string, lat: number, lon: number }[] = [];
+            const subBoxSize = 0.04;
+
+            if (this.DONG_REGISTRY[cortarNo]) {
+                searchPoints = this.DONG_REGISTRY[cortarNo];
+            } else {
+                const { lat: centerLat, lon: centerLon } = this.getRegionCoords(cortarNo);
+                const gridSize = 4;
+                const step = 0.04;
+                const startOffset = -0.06;
+                for (let i = 0; i < gridSize; i++) {
+                    for (let j = 0; j < gridSize; j++) {
+                        searchPoints.push({
+                            name: `Grid_${i}_${j}`,
+                            lat: centerLat + startOffset + (i * step),
+                            lon: centerLon + startOffset + (j * step)
+                        });
+                    }
+                }
+            }
+
+            for (const point of searchPoints) {
+                const { lat, lon } = point;
+                const btm = lat - subBoxSize;
+                const top = lat + subBoxSize;
+                const lft = lon - subBoxSize;
+                const rgt = lon + subBoxSize;
+
+                const params = new URLSearchParams();
+                params.append('rletTpCd', 'APT:ABYG:JGC');
+                params.append('tradTpCd', criteria.tradeType || 'A1');
+                params.append('z', '15');
+                params.append('lat', String(lat.toFixed(7)));
+                params.append('lon', String(lon.toFixed(7)));
+                params.append('btm', String(btm.toFixed(7)));
+                params.append('lft', String(lft.toFixed(7)));
+                params.append('top', String(top.toFixed(7)));
+                params.append('rgt', String(rgt.toFixed(7)));
+                params.append('page', '1');
+
+                if (criteria.priceMax) params.append('priceMax', String(criteria.priceMax));
+                if (criteria.areaMin) params.append('areaMin', String(Math.floor(criteria.areaMin)));
+                if (criteria.areaMax) params.append('areaMax', String(Math.ceil(criteria.areaMax)));
+                if (criteria.roomCount && criteria.roomCount >= 4) params.append('tag', 'FOURROOM');
+
+                urls.push(`${NAVER_LAND_PC_BBOX_API}?${params.toString()}`);
+            }
         }
         return urls;
     }
