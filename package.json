@@ -14,13 +14,10 @@
     "@mantine/form": "^8.3.10",
     "@mantine/hooks": "^8.3.10",
     "@prisma/client": "^5.10.2",
-    "@sparticuz/chromium": "^143.0.4",
     "@tabler/icons-react": "^3.36.0",
     "dayjs": "^1.11.19",
     "next": "15.1.9",
     "node-fetch": "^2.7.0",
-    "playwright": "^1.58.2",
-    "playwright-core": "^1.58.2",
     "react": "19.0.0",
     "react-dom": "19.0.0"
   },
