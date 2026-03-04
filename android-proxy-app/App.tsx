@@ -51,13 +51,23 @@ export default function App() {
       const batchResults = await Promise.all(
         batch.map(async (url) => {
           try {
+            const isPC = url.includes('new.land.naver.com');
             const res = await fetch(url, {
               headers: {
-                'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
-                'Referer': 'https://m.land.naver.com/'
+                'User-Agent': isPC
+                  ? 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+                  : 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
+                'Referer': isPC
+                  ? 'https://new.land.naver.com/'
+                  : 'https://m.land.naver.com/',
+                'Accept': 'application/json, text/plain, */*',
+                'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7'
               }
             });
-            if (!res.ok) return [];
+            if (!res.ok) {
+              addLog(`❌ 응답 실패 (${res.status}): ${url.substring(0, 40)}...`);
+              return [];
+            }
             const json = await res.json();
             if (Array.isArray(json.body)) return json.body;
             if (Array.isArray(json.articleList)) return json.articleList;
