@@ -399,7 +399,10 @@ export class NaverLandService {
                     const lft = lon - dongBoxSize;
                     const rgt = lon + dongBoxSize;
 
-                    for (let page = 1; page <= 3; page++) {
+                    // Timeout prevention: If scanning massive areas (>3 dongs in Gu), only fetch 1 page per dong
+                    const maxPages = dongs.length > 3 ? 1 : 3;
+
+                    for (let page = 1; page <= maxPages; page++) {
                         const params = new URLSearchParams();
                         params.append('cortarNo', dongCortarNo); // 10자리 동 cortarNo
                         params.append('rletTpCd', 'APT:ABYG:JGC');
