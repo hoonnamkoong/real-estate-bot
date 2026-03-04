@@ -60,7 +60,7 @@ export async function searchProperties(data: FilterValues): Promise<Property[]> 
             // Trigger Android Phone via Join Webhook to wake up and run the app
             const webhookUrl = process.env.JOIN_WEBHOOK_URL || 'https://joinjoaomgcd.appspot.com/_ah/api/messaging/v1/sendPush?apikey=f78d04c55f3c4d378233c629a08cc669&text=run_proxy&deviceId=2914080424af4b78acab862f02787791';
             console.log(`[searchProperties] Triggering phone via Join Webhook...`);
-            fetch(webhookUrl).catch(e => console.error('Join Webhook failed:', e));
+            await fetch(webhookUrl).catch(e => console.error('Join Webhook failed:', e));
 
             // Give the phone 2 seconds to turn on screen and launch the app before inserting the job
             await new Promise(resolve => setTimeout(resolve, 2000));
@@ -120,7 +120,7 @@ export async function searchProperties(data: FilterValues): Promise<Property[]> 
                 const baseWebhookUrl = process.env.JOIN_WEBHOOK_URL || 'https://joinjoaomgcd.appspot.com/_ah/api/messaging/v1/sendPush?apikey=f78d04c55f3c4d378233c629a08cc669&text=run_proxy&deviceId=2914080424af4b78acab862f02787791';
                 const finishWebhookUrl = baseWebhookUrl.replace('text=run_proxy', 'text=scraping_done');
                 console.log(`[searchProperties] Triggering finish webhook: scraping_done`);
-                fetch(finishWebhookUrl).catch(e => console.error('Finish Webhook failed:', e));
+                await fetch(finishWebhookUrl).catch(e => console.error('Finish Webhook failed:', e));
             } catch (e) { }
         }
 
