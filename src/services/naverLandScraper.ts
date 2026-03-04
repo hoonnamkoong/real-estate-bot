@@ -28,30 +28,35 @@ const REGION_BBOX: Record<string, { centerLat: number, centerLon: number, bbox: 
 };
 
 export interface ScrapedProperty {
-    id: string;
-    name: string;
-    dongName: string;
-    price: number;
+    id: string; // complexNo or articleNo
+    name: string; // complexNam or atclNm
+    dongName: string; // address
+    price: number; // in 만원
     area: { m2: number; pyeong: number };
     link: string;
     tradeType: string;
 }
 
-const NAVER_HEADERS = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-    'Referer': 'https://new.land.naver.com/',
+const MOBILE_HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
+    'Referer': 'https://m.land.naver.com/',
     'Accept': 'application/json, text/plain, */*',
-    'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
-    'sec-fetch-dest': 'empty',
-    'sec-fetch-mode': 'cors',
-    'sec-fetch-site': 'same-origin',
+    'Accept-Language': 'ko-KR,ko;q=0.9',
 };
 
+// Vercel direct fetch using Mobile API (Bypasses 429 block, supports filters)
 export async function scrapeNaverProperties(
     cortarNos: string[],
     criteria: SearchCriteria
 ): Promise<ScrapedProperty[]> {
     const allProperties: ScrapedProperty[] = [];
+
+    // Construct common filter params
+    const filterParams = new URLSearchParams();
+    if (criteria.priceMax) filterParams.set('dprcMax', String(criteria.priceMax)); // in 만원
+    if (criteria.areaMin) filterParams.set('spcMin', String(criteria.areaMin)); // in m2
+    filterParams.set('spcMax', '900000000');
+    if (criteria.roomCount && criteria.roomCount >= 4) filterParams.set('tag', 'FOURROOM');
 
     for (const cortarNo of cortarNos) {
         const region = REGION_BBOX[cortarNo];
@@ -60,76 +65,79 @@ export async function scrapeNaverProperties(
             continue;
         }
 
-        const [leftLon, bottomLat, rightLon, topLat] = region.bbox;
-        const tag = (criteria.roomCount && criteria.roomCount >= 4) ? ':FOURROOM:::::::' : ':::::::';
+        const [lft, btm, rgt, top] = region.bbox;
+        const z = 12; // Zoom level
 
-        const url = `https://new.land.naver.com/api/complexes/single-markers/2.0?` +
-            `cortarNo=${cortarNo}&zoom=16&priceType=RETAIL&markerId&markerType&` +
-            `selectedComplexNo&selectedComplexBuildingNo&fakeComplexMarker&` +
-            `realEstateType=APT%3APRE%3AABYG%3AJGC&tradeType=${criteria.tradeType || 'A1'}&` +
-            `tag=${encodeURIComponent(tag)}&rentPriceMin=0&rentPriceMax=900000000&priceMin=0&` +
-            (criteria.priceMax ? `priceMax=${criteria.priceMax}&` : '') +
-            (criteria.areaMin ? `areaMin=${criteria.areaMin}&` : '') +
-            `areaMax=900000000&oldBuildYears&recentlyBuildYears&minHouseHoldCount&maxHouseHoldCount&` +
-            `showArticle=false&sameAddressGroup=false&minMaintenanceCost&maxMaintenanceCost&directions=&` +
-            `leftLon=${leftLon}&rightLon=${rightLon}&topLat=${topLat}&bottomLat=${bottomLat}&isPresale=true`;
+        // 1. Fetch Cluster List
+        const clusterUrl = `https://m.land.naver.com/cluster/clusterList?view=atcl&cortarNo=${cortarNo}&rletTpCd=APT&tradTpCd=${criteria.tradeType || 'A1'}&z=${z}&lat=${region.centerLat}&lon=${region.centerLon}&btm=${btm}&lft=${lft}&top=${top}&rgt=${rgt}&${filterParams.toString()}`;
 
-        console.log(`[Scraper] Fetching single-markers for ${cortarNo}...`);
-        console.log(`[Scraper] URL: ${url.substring(0, 150)}`);
+        console.log(`[Scraper] Fetching mobile clusterList for ${cortarNo}...`);
 
-        let markers: any[] = [];
         try {
-            const res = await fetch(url, { headers: NAVER_HEADERS });
-            console.log(`[Scraper] Response status: ${res.status}`);
+            const clusterRes = await fetch(clusterUrl, { headers: MOBILE_HEADERS });
+            if (!clusterRes.ok) {
+                console.error(`[Scraper] Cluster API failed: ${clusterRes.status}`);
+                continue;
+            }
 
-            if (res.ok) {
-                const data = await res.json();
-                if (Array.isArray(data)) {
-                    markers = data;
-                    console.log(`[Scraper] Got ${markers.length} markers`);
-                } else {
-                    console.log('[Scraper] Unexpected data format:', typeof data);
-                }
-            } else {
-                const text = await res.text();
-                console.error(`[Scraper] Error response: ${text.substring(0, 200)}`);
+            const clusterData = await clusterRes.json();
+            const clusters = clusterData.data?.ARTICLE || [];
+            console.log(`[Scraper] Got ${clusters.length} clusters for ${cortarNo}`);
+
+            // 2. Fetch Article Details per Cluster (in parallel chunks)
+            // Limit concurrency to avoid being blocked if there are many clusters
+            const limit = 5;
+            for (let i = 0; i < clusters.length; i += limit) {
+                const chunk = clusters.slice(i, i + limit);
+
+                await Promise.all(chunk.map(async (cluster: any) => {
+                    const lgeo = cluster.lgeo; // This is the complex ID (itemId) for apartments
+                    if (!lgeo) return;
+
+                    const articleUrl = `https://m.land.naver.com/cluster/ajax/articleList?itemId=${lgeo}&lgeo=${lgeo}&rletTpCd=APT&tradTpCd=${criteria.tradeType || 'A1'}&z=${z}&lat=${cluster.lat}&lon=${cluster.lon}&totCnt=${cluster.count}&${filterParams.toString()}`;
+
+                    try {
+                        const articleRes = await fetch(articleUrl, { headers: MOBILE_HEADERS });
+                        if (!articleRes.ok) return;
+
+                        const articleData = await articleRes.json();
+                        const articles = articleData.body || [];
+
+                        for (const art of articles) {
+                            const priceMwon = art.prc || 0;
+                            const areaM2 = art.spc1 || 0;
+                            const complexName = art.atclNm || '(이름 없음)';
+
+                            allProperties.push({
+                                id: art.atclNo || `${lgeo}_${priceMwon}_${areaM2}`,
+                                name: complexName,
+                                dongName: '', // Mobile article list does not always provide dongName directly
+                                price: priceMwon,
+                                area: { m2: areaM2, pyeong: Math.round(areaM2 / 3.3058) },
+                                link: `https://m.land.naver.com/article/info/${art.atclNo}`,
+                                tradeType: criteria.tradeType || 'A1',
+                            });
+                        }
+                    } catch (e) {
+                        console.error(`[Scraper] Article fetch failed for ${lgeo}`);
+                    }
+                }));
             }
         } catch (e: any) {
-            console.error(`[Scraper] Fetch failed: ${e.message}`);
-        }
-
-        // Map markers to properties
-        for (const marker of markers) {
-            const complexNo = String(marker.complexNo || marker.markerId || '');
-            if (!complexNo) continue;
-
-            // The marker from showArticle=false has these fields based on our test
-            const dealPrice = marker.dealPrice || marker.minDealPrice || 0;
-            const area = marker.area1 || marker.representativeArea || 0;
-            const priceMwon = typeof dealPrice === 'number' ? dealPrice : parseFloat(dealPrice) || 0;
-            const areaM2 = typeof area === 'number' ? area : parseFloat(area) || 0;
-
-            // Client-side filter
-            if (criteria.priceMax && priceMwon > 0 && priceMwon > criteria.priceMax) continue;
-            if (criteria.areaMin && areaM2 > 0 && areaM2 < criteria.areaMin) continue;
-
-            allProperties.push({
-                id: complexNo,
-                name: marker.complexName || '(이름 없음)',
-                dongName: marker.cortarAddress || marker.address || '',
-                price: priceMwon,
-                area: { m2: areaM2, pyeong: Math.round(areaM2 / 3.3058) },
-                link: `https://new.land.naver.com/complexes/${complexNo}`,
-                tradeType: criteria.tradeType || 'A1',
-            });
+            console.error(`[Scraper] Error processing ${cortarNo}: ${e.message}`);
         }
     }
 
-    // Remove duplicates
+    console.log(`[Scraper] Total properties found before dedup: ${allProperties.length}`);
+
+    // Deduplicate by complex name and price to avoid returning the same listing from multiple realtors
     const seen = new Set<string>();
-    return allProperties.filter(p => {
-        if (seen.has(p.id)) return false;
-        seen.add(p.id);
+    const uniqueProps = allProperties.filter(p => {
+        const key = `${p.name}_${p.price}_${p.area.m2}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
         return true;
     });
+
+    return uniqueProps;
 }
