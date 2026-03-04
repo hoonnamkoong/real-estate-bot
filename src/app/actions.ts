@@ -115,15 +115,7 @@ export async function searchProperties(data: FilterValues): Promise<Property[]> 
             } as any];
         }
 
-        if (isSuccess) {
-            // Trigger Android Phone via Join Webhook to notify that scraping is done
-            try {
-                const baseWebhookUrl = 'https://joinjoaomgcd.appspot.com/_ah/api/messaging/v1/sendPush?apikey=f78d04c55f3c4d378233c629a08cc669&text=run_proxy&deviceId=2914080424af4b78acab862f02787791';
-                const finishWebhookUrl = baseWebhookUrl.replace('text=run_proxy', 'text=scraping_done');
-                console.log(`[searchProperties] Triggering finish webhook: scraping_done`);
-                await fetch(finishWebhookUrl).catch(e => console.error('Finish Webhook failed:', e));
-            } catch (e) { }
-        }
+        // Webhook trigger moved to end of async block to allow 5s delay
 
         // Remove duplicates safely
         const uniqueItems = Array.from(new Map(results.map(item => [((item as any).atclNo || item.id), item])).values());
@@ -190,6 +182,19 @@ export async function searchProperties(data: FilterValues): Promise<Property[]> 
                 }
             } catch (e) {
                 console.error('Failed to send telegram notification:', e);
+            }
+
+            // Delayed Webhook (5 seconds after UI renders)
+            if (isSuccess) {
+                try {
+                    await new Promise(resolve => setTimeout(resolve, 5000));
+                    const baseWebhookUrl = 'https://joinjoaomgcd.appspot.com/_ah/api/messaging/v1/sendPush?apikey=f78d04c55f3c4d378233c629a08cc669&text=run_proxy&deviceId=2914080424af4b78acab862f02787791';
+                    const finishWebhookUrl = baseWebhookUrl.replace('text=run_proxy', 'text=scraping_done');
+                    console.log(`[searchProperties] Triggering delayed finish webhook (5s): scraping_done`);
+                    await fetch(finishWebhookUrl);
+                } catch (e) {
+                    console.error('Delayed Finish Webhook failed:', e);
+                }
             }
         })();
 
