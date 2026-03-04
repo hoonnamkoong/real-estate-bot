@@ -1,0 +1,11 @@
+★ eas-cli@18.0.6 is now available.
+To upgrade, run:
+npm install -g eas-cli
+Proceeding with outdated version.
+
+(node:24784) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+The following error occurred:
+  All of the following must be provided when using --json: --non-interactive
+See more help with --help
+    Error: build:list command failed.
