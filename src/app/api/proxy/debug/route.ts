@@ -8,43 +8,26 @@ export async function GET() {
         const jobs = await prisma.searchJob.findMany({
             orderBy: { createdAt: 'desc' },
             take: 5,
-            select: {
-                id: true,
-                status: true,
-                createdAt: true,
-                updatedAt: true,
-            }
+            select: { id: true, status: true, createdAt: true }
         });
 
-        const settings = await prisma.searchSetting.findMany({
-            orderBy: { createdAt: 'desc' },
-            take: 1,
-            select: {
-                id: true,
-                createdAt: true,
-            }
-        });
-
-        // For the latest completed job, get result length
         const latestCompleted = await prisma.searchJob.findFirst({
             where: { status: 'COMPLETED' },
-            orderBy: { updatedAt: 'desc' },
-            select: { id: true, updatedAt: true, result: true, params: true }
+            orderBy: { updatedAt: 'desc' }
         });
 
         let latestResultCount = -1;
-        let latestParams = null;
         if (latestCompleted && latestCompleted.result) {
-            latestResultCount = Array.isArray(latestCompleted.result) ? latestCompleted.result.length : -2;
-            latestParams = latestCompleted.params;
+            const resArr = latestCompleted.result as any[];
+            latestResultCount = Array.isArray(resArr) ? resArr.length : -2;
         }
 
         return NextResponse.json({
-            success: true, jobs, settings, latestCompletedInfo: {
+            success: true,
+            jobs,
+            latestCompletedInfo: {
                 id: latestCompleted?.id,
-                updatedAt: latestCompleted?.updatedAt,
-                count: latestResultCount,
-                params: latestParams
+                count: latestResultCount
             }
         });
     } catch (e: any) {
