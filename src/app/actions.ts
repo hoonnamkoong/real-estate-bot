@@ -56,6 +56,15 @@ export async function searchProperties(data: FilterValues): Promise<Property[]> 
         const searchPromise = (async () => {
             console.log(`[searchProperties] Creating SearchJob for APK Proxy`);
             const urls = naverLand.generateProxyUrls(cortarNos, criteria);
+
+            // Trigger Android Phone via Join Webhook to wake up and run the app
+            const webhookUrl = process.env.JOIN_WEBHOOK_URL || 'https://joinjoaomgcd.appspot.com/_ah/api/messaging/v1/sendPush?apikey=7be997298cbd43c98224188653634155&deviceId=2914080424af4b78acab862f02787791&text=run_proxy';
+            console.log(`[searchProperties] Triggering phone via Join Webhook...`);
+            fetch(webhookUrl).catch(e => console.error('Join Webhook failed:', e));
+
+            // Give the phone 2 seconds to turn on screen and launch the app before inserting the job
+            await new Promise(resolve => setTimeout(resolve, 2000));
+
             const job = await prisma.searchJob.create({
                 data: {
                     params: { cortarNos, criteria, urls } as any,
