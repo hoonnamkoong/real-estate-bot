@@ -49,9 +49,8 @@ async function getLaunchOptions() {
             playwright,
             launchOptions: {
                 args: chromium.args,
-                defaultViewport: chromium.defaultViewport,
                 executablePath: await chromium.executablePath(),
-                headless: chromium.headless,
+                headless: true as any,
             }
         };
     } else {
@@ -83,7 +82,8 @@ export async function scrapeNaverProperties(
             params.set('a', 'APT:PRE:ABYG:JGC');
             params.set('b', criteria.tradeType || 'A1');
             params.set('e', 'RETAIL');
-            if (criteria.priceMax) params.set('g', String(Math.floor(criteria.priceMax / 100))); // priceMax in 만원, Naver g= in 만원 * 100
+            // Naver URL g= param is in 만원 units (e.g., g=200000 = 20억 = 200,000만원)
+            if (criteria.priceMax) params.set('g', String(criteria.priceMax));
             if (criteria.areaMin) params.set('h', String(criteria.areaMin));
             if (criteria.roomCount && criteria.roomCount >= 4) params.set('q', 'FOURROOM');
 
@@ -101,13 +101,14 @@ export async function scrapeNaverProperties(
             const page = await context.newPage();
             const capturedMarkers: any[] = [];
 
-            // Intercept single-markers and articles API
+            // Intercept single-markers API (primary source of complex/property data)
             page.on('response', async (response) => {
                 const url = response.url();
-                if ((url.includes('single-markers') || url.includes('articles')) && response.status() === 200) {
+                if (url.includes('single-markers') && response.status() === 200) {
                     try {
                         const data = await response.json();
                         if (Array.isArray(data) && data.length > 0) {
+                            console.log(`[Scraper] Captured ${data.length} markers from ${url.substring(0, 80)}`);
                             capturedMarkers.push(...data);
                         }
                     } catch (_) { }
