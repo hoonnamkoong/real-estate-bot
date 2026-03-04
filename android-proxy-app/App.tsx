@@ -59,7 +59,9 @@ export default function App() {
             });
             if (!res.ok) return [];
             const json = await res.json();
-            return Array.isArray(json.body) ? json.body : [];
+            if (Array.isArray(json.body)) return json.body;
+            if (Array.isArray(json.articleList)) return json.articleList;
+            return [];
           } catch (e) {
             return [];
           }
