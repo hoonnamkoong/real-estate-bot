@@ -136,18 +136,7 @@ export async function searchProperties(data: FilterValues): Promise<Property[]> 
                         areaMin: data.areaMin || null,
                         areaMax: null,
                         roomCount: data.roomCount || null,
-                        results: filtered.map((a: any) => ({
-                            id: String(a.atclNo),
-                            name: a.atclNm || 'Unknown',
-                            price: Number(a.prc) || 0,
-                            area: {
-                                m2: Number(a.spc1) || 0,
-                                pyeong: Math.round((Number(a.spc1) || 0) * 0.3025 * 10) / 10
-                            },
-                            link: `https://fintech-api.land.naver.com/v1/ad/article/${a.atclNo}`,
-                            dongName: a._dongName || '',
-                            note: (a.note as any) || undefined
-                        })) as any
+                        results: filtered as any
                     } as any
                 });
                 console.log(`Saved search results snapshot with ID: ${savedSettings.id}`);
