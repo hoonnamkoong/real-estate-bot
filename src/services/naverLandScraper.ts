@@ -1,7 +1,6 @@
-import { chromium } from 'playwright';
 import { SearchCriteria } from './naverLand';
 
-const REGION_COORDS: Record<string, { lat: number, lon: number, dongCortarNo?: string }> = {
+const REGION_COORDS: Record<string, { lat: number, lon: number }> = {
     '1168000000': { lat: 37.514, lon: 127.047 },  // Gangnam
     '1165000000': { lat: 37.476, lon: 127.018 },  // Seocho
     '1171000000': { lat: 37.515, lon: 127.115 },  // Songpa
@@ -34,16 +33,43 @@ export interface ScrapedProperty {
     price: number;
     area: { m2: number; pyeong: number };
     link: string;
-    rooms?: number;
     complexNo?: string;
     tradeType: string;
+}
+
+async function getLaunchOptions() {
+    const isVercel = process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME;
+
+    if (isVercel) {
+        // Use @sparticuz/chromium for Vercel/Lambda compatibility
+        const chromium = (await import('@sparticuz/chromium')).default;
+        const playwright = (await import('playwright-core')).chromium;
+
+        return {
+            playwright,
+            launchOptions: {
+                args: chromium.args,
+                defaultViewport: chromium.defaultViewport,
+                executablePath: await chromium.executablePath(),
+                headless: chromium.headless,
+            }
+        };
+    } else {
+        // Local: Use regular playwright
+        const playwright = (await import('playwright')).chromium;
+        return {
+            playwright,
+            launchOptions: { headless: true }
+        };
+    }
 }
 
 export async function scrapeNaverProperties(
     cortarNos: string[],
     criteria: SearchCriteria
 ): Promise<ScrapedProperty[]> {
-    const browser = await chromium.launch({ headless: true });
+    const { playwright, launchOptions } = await getLaunchOptions();
+    const browser = await playwright.launch(launchOptions as any);
     const allProperties: ScrapedProperty[] = [];
 
     try {
@@ -51,16 +77,18 @@ export async function scrapeNaverProperties(
             const center = REGION_COORDS[cortarNo] || { lat: 37.514, lon: 127.047 };
 
             // Build the Naver Land PC URL with all filters
+            // Naver URL params: g = priceMax in 만원, h = areaMin in m2, q = FOURROOM
             const params = new URLSearchParams();
             params.set('ms', `${center.lat},${center.lon},16`);
             params.set('a', 'APT:PRE:ABYG:JGC');
             params.set('b', criteria.tradeType || 'A1');
             params.set('e', 'RETAIL');
-            if (criteria.priceMax) params.set('g', String(Math.floor(criteria.priceMax / 100)));
+            if (criteria.priceMax) params.set('g', String(Math.floor(criteria.priceMax / 100))); // priceMax in 만원, Naver g= in 만원 * 100
             if (criteria.areaMin) params.set('h', String(criteria.areaMin));
             if (criteria.roomCount && criteria.roomCount >= 4) params.set('q', 'FOURROOM');
 
             const naverUrl = `https://new.land.naver.com/complexes?${params.toString()}`;
+            console.log(`[Scraper] Fetching ${naverUrl}`);
 
             const context = await browser.newContext({
                 userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
@@ -73,13 +101,13 @@ export async function scrapeNaverProperties(
             const page = await context.newPage();
             const capturedMarkers: any[] = [];
 
-            // Intercept single-markers API to grab property data
+            // Intercept single-markers and articles API
             page.on('response', async (response) => {
                 const url = response.url();
-                if (url.includes('single-markers') && response.status() === 200) {
+                if ((url.includes('single-markers') || url.includes('articles')) && response.status() === 200) {
                     try {
                         const data = await response.json();
-                        if (Array.isArray(data)) {
+                        if (Array.isArray(data) && data.length > 0) {
                             capturedMarkers.push(...data);
                         }
                     } catch (_) { }
@@ -89,13 +117,15 @@ export async function scrapeNaverProperties(
             try {
                 await page.goto(naverUrl, { waitUntil: 'networkidle', timeout: 25000 });
                 await page.waitForTimeout(3000);
-            } catch (e) {
-                console.error(`Goto failed for ${cortarNo}:`, e);
+            } catch (e: any) {
+                console.error(`Page load issue for ${cortarNo}: ${e.message}`);
             }
+
+            console.log(`[Scraper] Captured ${capturedMarkers.length} markers for ${cortarNo}`);
 
             // Map captured markers to ScrapedProperty
             for (const marker of capturedMarkers) {
-                const complexNo = marker.complexNo || marker.markerId || '';
+                const complexNo = String(marker.complexNo || marker.markerId || '');
                 const price = marker.dealPrice || marker.leasePrice || marker.rentPrice || 0;
                 const area = marker.area1 || marker.areaSize || 0;
                 const priceMwon = typeof price === 'number' ? price : parseFloat(price) || 0;
@@ -103,12 +133,12 @@ export async function scrapeNaverProperties(
 
                 if (!complexNo || priceMwon === 0) continue;
 
-                // Apply client-side filters as well (belt and suspenders)
+                // Apply client-side filters for safety
                 if (criteria.priceMax && priceMwon > criteria.priceMax) continue;
-                if (criteria.areaMin && areaM2 < criteria.areaMin) continue;
+                if (criteria.areaMin && areaM2 > 0 && areaM2 < criteria.areaMin) continue;
 
                 allProperties.push({
-                    id: String(complexNo),
+                    id: complexNo,
                     name: marker.complexName || marker.name || '(이름 없음)',
                     dongName: marker.cortarAddress || marker.address || '',
                     price: priceMwon,
@@ -128,7 +158,7 @@ export async function scrapeNaverProperties(
         await browser.close();
     }
 
-    // Remove duplicate complex IDs (keep first / lowest price)
+    // Remove duplicate complex IDs
     const seen = new Set<string>();
     const unique = allProperties.filter(p => {
         if (seen.has(p.id)) return false;
