@@ -117,12 +117,12 @@ export async function searchProperties(data: FilterValues): Promise<Property[]> 
 
         if (isSuccess) {
             // Trigger Android Phone via Join Webhook to notify that scraping is done
-            try {
-                const baseWebhookUrl = 'https://joinjoaomgcd.appspot.com/_ah/api/messaging/v1/sendPush?apikey=f78d04c55f3c4d378233c629a08cc669&text=run_proxy&deviceId=2914080424af4b78acab862f02787791';
-                const finishWebhookUrl = baseWebhookUrl.replace('text=run_proxy', 'text=scraping_done');
-                console.log(`[searchProperties] Triggering finish webhook: scraping_done`);
-                await fetch(finishWebhookUrl).catch(e => console.error('Finish Webhook failed:', e));
-            } catch (e) { }
+            // try {
+            //     const baseWebhookUrl = 'https://joinjoaomgcd.appspot.com/_ah/api/messaging/v1/sendPush?apikey=f78d04c55f3c4d378233c629a08cc669&text=run_proxy&deviceId=2914080424af4b78acab862f02787791';
+            //     const finishWebhookUrl = baseWebhookUrl.replace('text=run_proxy', 'text=scraping_done');
+            //     console.log(`[searchProperties] Triggering finish webhook: scraping_done (DISABLED DURING DEBUGGING)`);
+            //     // await fetch(finishWebhookUrl).catch(e => console.error('Finish Webhook failed:', e));
+            // } catch (e) { }
         }
 
         // Remove duplicates safely
