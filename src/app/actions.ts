@@ -94,8 +94,10 @@ export async function searchProperties(data: FilterValues): Promise<Property[]> 
         })();
 
         let results: Property[] = [];
+        let isSuccess = false;
         try {
             results = await Promise.race([searchPromise, timeoutPromise]);
+            isSuccess = true;
         } catch (e: any) {
             console.warn(`[searchProperties] Timeout or Error: ${e.message}`);
             // Return a special debug item so we know it timed out
@@ -108,6 +110,16 @@ export async function searchProperties(data: FilterValues): Promise<Property[]> 
                 dongName: '시스템',
                 note: 'High' as any
             } as any];
+        }
+
+        if (isSuccess) {
+            // Trigger Android Phone via Join Webhook to notify that scraping is done
+            try {
+                const baseWebhookUrl = process.env.JOIN_WEBHOOK_URL || 'https://joinjoaomgcd.appspot.com/_ah/api/messaging/v1/sendPush?apikey=f78d04c55f3c4d378233c629a08cc669&text=run_proxy&deviceId=2914080424af4b78acab862f02787791';
+                const finishWebhookUrl = baseWebhookUrl.replace('text=run_proxy', 'text=scraping_done');
+                console.log(`[searchProperties] Triggering finish webhook: scraping_done`);
+                fetch(finishWebhookUrl).catch(e => console.error('Finish Webhook failed:', e));
+            } catch (e) { }
         }
 
         // Remove duplicates safely
