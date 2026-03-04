@@ -6,12 +6,11 @@ export const dynamic = 'force-dynamic';
 export async function GET() {
     try {
         // Find latest setting to use its ID 
-        const setting = await prisma.searchSetting.findFirst({ orderBy: { createdAt: 'desc' } });
+        const setting = await prisma.searchSetting.findFirst({ orderBy: { updatedAt: 'desc' } });
         if (!setting) return NextResponse.json({ error: 'no setting' });
 
         const job = await prisma.searchJob.create({
             data: {
-                settingId: setting.id,
                 params: {
                     urls: ['https://new.land.naver.com/api/articles?cortarNo=1171010300&rletTpCd=APT:ABYG:JGC&tradTpCd=A1&page=1&priceMax=200000&areaMin=120&tag=FOURROOM'],
                     triggeredBy: 'test_pc_api'
