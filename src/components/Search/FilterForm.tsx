@@ -1,7 +1,7 @@
 'use client';
 
 import {
-    Paper, Grid, Select, NumberInput, Button, Group, Text, RangeSlider, Stack, TagsInput
+    Paper, Grid, Select, NumberInput, Button, Group, Text, RangeSlider, Stack, MultiSelect
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { IconSearch } from '@tabler/icons-react';
@@ -41,9 +41,25 @@ export function FilterForm({ onSearch, loading, initialValues }: FilterFormProps
             <form onSubmit={form.onSubmit((values: FilterValues) => onSearch(values))}>
                 <Grid align="flex-end" gutter="md">
                     <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
-                        <TagsInput
-                            label="지역 검색"
-                            placeholder="구/동 입력 후 엔터 (예: 송파구, 풍납동)"
+                        <MultiSelect
+                            label="지역 (서울 전역)"
+                            placeholder="구 선택 (복수 가능)"
+                            data={[
+                                { value: 'gangnam', label: '강남구' }, { value: 'seocho', label: '서초구' },
+                                { value: 'songpa', label: '송파구' }, { value: 'yongsan', label: '용산구' },
+                                { value: 'seongdong', label: '성동구' }, { value: 'mapo', label: '마포구' },
+                                { value: 'yangcheon', label: '양천구' }, { value: 'yeongdeungpo', label: '영등포구' },
+                                { value: 'gangdong', label: '강동구' }, { value: 'jongno', label: '종로구' },
+                                { value: 'junggu', label: '중구' }, { value: 'dongdaemun', label: '동대문구' },
+                                { value: 'jungnang', label: '중랑구' }, { value: 'seongbuk', label: '성북구' },
+                                { value: 'gangbuk', label: '강북구' }, { value: 'dobong', label: '도봉구' },
+                                { value: 'nowon', label: '노원구' }, { value: 'eunpyeong', label: '은평구' },
+                                { value: 'seodaemun', label: '서대문구' }, { value: 'gangseo', label: '강서구' },
+                                { value: 'guro', label: '구로구' }, { value: 'geumcheon', label: '금천구' },
+                                { value: 'dongjak', label: '동작구' }, { value: 'gwanak', label: '관악구' },
+                            ]}
+                            searchable
+                            hidePickedOptions
                             {...form.getInputProps('regions')}
                         />
                     </Grid.Col>
