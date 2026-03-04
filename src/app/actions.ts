@@ -58,7 +58,8 @@ export async function searchProperties(data: FilterValues): Promise<Property[]> 
             const urls = naverLand.generateProxyUrls(cortarNos, criteria);
 
             // Trigger Android Phone via Join Webhook to wake up and run the app
-            const webhookUrl = process.env.JOIN_WEBHOOK_URL || 'https://joinjoaomgcd.appspot.com/_ah/api/messaging/v1/sendPush?apikey=f78d04c55f3c4d378233c629a08cc669&text=run_proxy&deviceId=2914080424af4b78acab862f02787791';
+            // FORCE use the newly provided URL, ignoring any stale Vercel env var
+            const webhookUrl = 'https://joinjoaomgcd.appspot.com/_ah/api/messaging/v1/sendPush?apikey=f78d04c55f3c4d378233c629a08cc669&text=run_proxy&deviceId=2914080424af4b78acab862f02787791';
             console.log(`[searchProperties] Triggering phone via Join Webhook...`);
             await fetch(webhookUrl).catch(e => console.error('Join Webhook failed:', e));
 
@@ -117,7 +118,7 @@ export async function searchProperties(data: FilterValues): Promise<Property[]> 
         if (isSuccess) {
             // Trigger Android Phone via Join Webhook to notify that scraping is done
             try {
-                const baseWebhookUrl = process.env.JOIN_WEBHOOK_URL || 'https://joinjoaomgcd.appspot.com/_ah/api/messaging/v1/sendPush?apikey=f78d04c55f3c4d378233c629a08cc669&text=run_proxy&deviceId=2914080424af4b78acab862f02787791';
+                const baseWebhookUrl = 'https://joinjoaomgcd.appspot.com/_ah/api/messaging/v1/sendPush?apikey=f78d04c55f3c4d378233c629a08cc669&text=run_proxy&deviceId=2914080424af4b78acab862f02787791';
                 const finishWebhookUrl = baseWebhookUrl.replace('text=run_proxy', 'text=scraping_done');
                 console.log(`[searchProperties] Triggering finish webhook: scraping_done`);
                 await fetch(finishWebhookUrl).catch(e => console.error('Finish Webhook failed:', e));
