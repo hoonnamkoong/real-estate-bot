@@ -73,19 +73,21 @@ export async function searchProperties(data: FilterValues): Promise<Property[]> 
             });
             console.log(`[searchProperties] Created Job ${job.id}, waiting for APK Proxy...`);
 
-            // Poll for completion (up to 12.0s to stay mostly within Vercel execution limits but give max time)
+            // Poll for completion (up to 48.0s to stay within Vercel execution limits but give max time)
             const proxyStart = Date.now();
             while (Date.now() - proxyStart < 48000) {
-                const check = await prisma.searchJob.findUnique({ where: { id: job.id } });
-                if (check?.status === 'COMPLETED') {
-                    const rawItems = (check.result as any[]) || [];
+                const checkJob = await prisma.searchJob.findUnique({
+                    where: { id: job.id }
+                });
+                if (checkJob && checkJob.status === 'COMPLETED') {
+                    const rawItems = (checkJob.result as any[]) || [];
                     console.log(`[searchProperties] Job ${job.id} completed! raw=${rawItems.length}`);
                     // Map raw Naver API format (spc1, prc, atclNo) → Property format (area, price, id)
                     const mapped = naverLand.mapNaverItemsToProperties(rawItems);
                     console.log(`[searchProperties] Mapped to ${mapped.length} Property items`);
                     return mapped;
                 }
-                if (check?.status === 'ERROR') {
+                if (checkJob?.status === 'ERROR') {
                     throw new Error('안드로이드 프록시 측 검색 오류 발생');
                 }
                 await new Promise(resolve => setTimeout(resolve, 600)); // Poll every 600ms
