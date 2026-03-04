@@ -378,13 +378,9 @@ export class NaverLandService {
         ],
     };
 
-    /**
-     * Generate direct Naver API URLs for the Android Proxy App.
-     * Uses per-dong cortarNo with fixed bbox — no zoom-level omissions.
-     */
     generateProxyUrls(cortarNos: string[], criteria: SearchCriteria): string[] {
         const urls: string[] = [];
-        const NAVER_LAND_PC_BBOX_API = 'https://new.land.naver.com/api/articles';
+        const NAVER_LAND_MOBILE_BBOX_API = 'https://m.land.naver.com/cluster/ajax/articleList';
 
         for (const cortarNo of cortarNos) {
             let searchPoints: { name: string, lat: number, lon: number }[] = [];
@@ -416,23 +412,27 @@ export class NaverLandService {
                 const rgt = lon + subBoxSize;
 
                 const params = new URLSearchParams();
+                params.append('reitId', '');
                 params.append('rletTpCd', 'APT:ABYG:JGC');
                 params.append('tradTpCd', criteria.tradeType || 'A1');
-                params.append('z', '15');
+                params.append('z', '14');
                 params.append('lat', String(lat.toFixed(7)));
                 params.append('lon', String(lon.toFixed(7)));
                 params.append('btm', String(btm.toFixed(7)));
                 params.append('lft', String(lft.toFixed(7)));
                 params.append('top', String(top.toFixed(7)));
                 params.append('rgt', String(rgt.toFixed(7)));
-                params.append('page', '1');
+                params.append('pgr', '1');
+                params.append('cortNo', cortarNo);
 
-                if (criteria.priceMax) params.append('priceMax', String(criteria.priceMax));
-                if (criteria.areaMin) params.append('areaMin', String(Math.floor(criteria.areaMin)));
-                if (criteria.areaMax) params.append('areaMax', String(Math.ceil(criteria.areaMax)));
+                if (criteria.priceMax) params.append('dprcMax', String(criteria.priceMax)); // Mobile unit is 만원
+                if (criteria.areaMin) params.append('spcMin', String(Math.floor(criteria.areaMin)));
+                if (criteria.areaMax) params.append('spcMax', String(Math.ceil(criteria.areaMax)));
+                else params.append('spcMax', '900000000'); // Required otherwise spcMin is ignored sometimes
+
                 if (criteria.roomCount && criteria.roomCount >= 4) params.append('tag', 'FOURROOM');
 
-                urls.push(`${NAVER_LAND_PC_BBOX_API}?${params.toString()}`);
+                urls.push(`${NAVER_LAND_MOBILE_BBOX_API}?${params.toString()}`);
             }
         }
         return urls;
