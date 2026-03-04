@@ -384,67 +384,22 @@ export class NaverLandService {
      */
     generateProxyUrls(cortarNos: string[], criteria: SearchCriteria): string[] {
         const urls: string[] = [];
-        const dongBoxSize = 0.035; // ~3.9km radius per dong, enough to cover one dong fully
+        const NAVER_LAND_PC_API = 'https://new.land.naver.com/api/articles';
 
         for (const cortarNo of cortarNos) {
-            // Use dong-level registry if available, else fallback to center-point search
-            const dongs = this.DONG_CORTAR_REGISTRY[cortarNo];
+            // PC API parameters
+            const params = new URLSearchParams();
+            params.append('cortarNo', cortarNo);
+            params.append('rletTpCd', 'APT:ABYG:JGC');
+            params.append('tradTpCd', criteria.tradeType || 'A1');
+            params.append('page', '1');
 
-            if (dongs) {
-                // Per-dong URL generation — one URL per dong × pages
-                for (const dong of dongs) {
-                    const { lat, lon, cortarNo: dongCortarNo } = dong;
-                    const btm = lat - dongBoxSize;
-                    const top = lat + dongBoxSize;
-                    const lft = lon - dongBoxSize;
-                    const rgt = lon + dongBoxSize;
+            if (criteria.priceMax) params.append('priceMax', String(criteria.priceMax));
+            if (criteria.areaMin) params.append('areaMin', String(Math.floor(criteria.areaMin)));
+            if (criteria.areaMax) params.append('areaMax', String(Math.ceil(criteria.areaMax)));
+            if (criteria.roomCount && criteria.roomCount >= 4) params.append('tag', 'FOURROOM');
 
-                    // Timeout prevention: If scanning massive areas (>3 dongs in Gu), only fetch 1 page per dong
-                    const maxPages = dongs.length > 3 ? 1 : 3;
-
-                    for (let page = 1; page <= maxPages; page++) {
-                        const params = new URLSearchParams();
-                        params.append('cortarNo', dongCortarNo); // 10자리 동 cortarNo
-                        params.append('rletTpCd', 'APT:ABYG:JGC');
-                        params.append('tradTpCd', criteria.tradeType || 'A1');
-                        params.append('z', '15');
-                        params.append('lat', String(lat));
-                        params.append('lon', String(lon));
-                        params.append('btm', String(btm.toFixed(7)));
-                        params.append('lft', String(lft.toFixed(7)));
-                        params.append('top', String(top.toFixed(7)));
-                        params.append('rgt', String(rgt.toFixed(7)));
-                        params.append('page', String(page));
-
-                        if (criteria.priceMax) params.append('dprcMax', String(criteria.priceMax));
-                        if (criteria.areaMin) params.append('spcMin', String(Math.floor(criteria.areaMin)));
-                        if (criteria.areaMax) params.append('spcMax', String(Math.ceil(criteria.areaMax)));
-
-                        const apiUrl = `${NAVER_LAND_MOBILE_HOST}/cluster/ajax/articleList?${params.toString()}`;
-                        urls.push(apiUrl);
-                    }
-                }
-            } else {
-                // Fallback: single bbox for unknown regions
-                const { lat, lon } = this.getRegionCoords(cortarNo);
-                for (let page = 1; page <= 3; page++) {
-                    const params = new URLSearchParams();
-                    params.append('cortarNo', cortarNo);
-                    params.append('rletTpCd', 'APT:ABYG:JGC');
-                    params.append('tradTpCd', criteria.tradeType || 'A1');
-                    params.append('z', '13');
-                    params.append('lat', String(lat));
-                    params.append('lon', String(lon));
-                    params.append('btm', String((lat - 0.08).toFixed(7)));
-                    params.append('lft', String((lon - 0.08).toFixed(7)));
-                    params.append('top', String((lat + 0.08).toFixed(7)));
-                    params.append('rgt', String((lon + 0.08).toFixed(7)));
-                    params.append('page', String(page));
-                    if (criteria.priceMax) params.append('dprcMax', String(criteria.priceMax));
-                    if (criteria.areaMin) params.append('spcMin', String(Math.floor(criteria.areaMin)));
-                    urls.push(`${NAVER_LAND_MOBILE_HOST}/cluster/ajax/articleList?${params.toString()}`);
-                }
-            }
+            urls.push(`${NAVER_LAND_PC_API}?${params.toString()}`);
         }
         return urls;
     }
