@@ -350,17 +350,20 @@ export class NaverLandService {
      * These are used to generate one bbox URL per dong (no zoom-level omissions).
      */
     private DONG_CORTAR_REGISTRY: Record<string, { name: string; cortarNo: string; lat: number; lon: number }[]> = {
-        '1171000000': [ // Songpa-gu
+        '1171000000': [ // Songpa-gu — 방이/문정 FIRST to avoid rate-limit miss
+            // ★ 우선 순위: 방이동/문정동을 맨 앞에 배치 (rate-limit 이전 요청)
+            { name: '방이동', cortarNo: '1171011100', lat: 37.517, lon: 127.128 }, // 올림픽선수기자촌 포함 북쪽
+            { name: '방이동남', cortarNo: '1171011100', lat: 37.506, lon: 127.126 }, // 방이1동 남쪽 매물
+            { name: '문정동', cortarNo: '1171010800', lat: 37.488, lon: 127.125 }, // 올림픽훼밀리/래미안
+            { name: '문정동동', cortarNo: '1171010800', lat: 37.483, lon: 127.136 }, // 문정래미안 동쪽
+            // 이하 나머지 동
             { name: '잠실동', cortarNo: '1171010100', lat: 37.513, lon: 127.085 },
             { name: '신천동', cortarNo: '1171010200', lat: 37.511, lon: 127.091 },
             { name: '풍납동', cortarNo: '1171010300', lat: 37.527, lon: 127.107 },
             { name: '송파동', cortarNo: '1171010400', lat: 37.504, lon: 127.110 },
             { name: '석촌동', cortarNo: '1171010500', lat: 37.503, lon: 127.103 },
-            { name: '삼전동', cortarNo: '1171010600', lat: 37.509, lon: 127.098 },
             { name: '가락동', cortarNo: '1171010700', lat: 37.493, lon: 127.117 },
-            { name: '문정동', cortarNo: '1171010800', lat: 37.486, lon: 127.124 },
             { name: '장지동', cortarNo: '1171010900', lat: 37.477, lon: 127.135 },
-            { name: '방이동', cortarNo: '1171011100', lat: 37.514, lon: 127.128 },
             { name: '오금동', cortarNo: '1171011200', lat: 37.504, lon: 127.135 },
             { name: '거여동', cortarNo: '1171011300', lat: 37.499, lon: 127.148 },
             { name: '마천동', cortarNo: '1171011400', lat: 37.490, lon: 127.155 },
@@ -440,8 +443,8 @@ export class NaverLandService {
 
         for (const cortarNo of cortarNos) {
             let searchPoints: { name: string, lat: number, lon: number, cortarNo?: string }[] = [];
-            // Restore bbox tracking to 0.025 (~2.5km) for better coverage of dense areas
-            const subBoxSize = 0.025;
+            // 0.015 (~1.5km): proven working range, reduces 307 overlap risk
+            const subBoxSize = 0.015;
 
             if (this.DONG_CORTAR_REGISTRY[cortarNo]) {
                 searchPoints = this.DONG_CORTAR_REGISTRY[cortarNo];
@@ -472,13 +475,13 @@ export class NaverLandService {
                 // IMPORTANT: Keep cortNo as parent gu code (e.g. 1171000000)
                 // Using dong-level cortarNo caused 307 redirects from Naver API
 
-                // Request pages 1 to 5 to capture up to 100 items per box without truncating
-                for (let page = 1; page <= 5; page++) {
+                // Pages 1-2 only — page 3+ often returns 307 (empty page redirect)
+                for (let page = 1; page <= 2; page++) {
                     const params = new URLSearchParams();
                     params.append('reitId', '');
                     params.append('rletTpCd', 'APT:ABYG:JGC');
                     params.append('tradTpCd', criteria.tradeType || 'A1');
-                    params.append('z', '14');
+                    params.append('z', '15'); // z=15 shows individual listings better than z=14 clusters
                     params.append('lat', String(lat.toFixed(7)));
                     params.append('lon', String(lon.toFixed(7)));
                     params.append('btm', String(btm.toFixed(7)));
