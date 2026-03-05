@@ -439,7 +439,7 @@ export class NaverLandService {
         const NAVER_LAND_MOBILE_BBOX_API = 'https://m.land.naver.com/cluster/ajax/articleList';
 
         for (const cortarNo of cortarNos) {
-            let searchPoints: { name: string, lat: number, lon: number }[] = [];
+            let searchPoints: { name: string, lat: number, lon: number, cortarNo?: string }[] = [];
             // Restore bbox tracking to 0.025 (~2.5km) for better coverage of dense areas
             const subBoxSize = 0.025;
 
@@ -469,6 +469,8 @@ export class NaverLandService {
                 const top = lat + subBoxSize;
                 const lft = lon - subBoxSize;
                 const rgt = lon + subBoxSize;
+                // Use per-dong cortarNo if available (DONG_CORTAR_REGISTRY), else use parent gu code
+                const effectiveCortarNo = (point as any).cortarNo || cortarNo;
 
                 // Request pages 1 to 5 to capture up to 100 items per box without truncating
                 for (let page = 1; page <= 5; page++) {
@@ -484,7 +486,7 @@ export class NaverLandService {
                     params.append('top', String(top.toFixed(7)));
                     params.append('rgt', String(rgt.toFixed(7)));
                     params.append('pgr', String(page));
-                    params.append('cortNo', cortarNo);
+                    params.append('cortNo', effectiveCortarNo); // ← KEY FIX: use dong-level code
 
                     if (criteria.priceMax) params.append('dprcMax', String(criteria.priceMax)); // Mobile unit is 만원
                     if (criteria.areaMin) params.append('spcMin', String(Math.floor(criteria.areaMin)));
