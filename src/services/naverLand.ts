@@ -17,14 +17,15 @@ export class NaverLandService {
     // Dong Coordinates Registry (Approximate Centers)
     private DONG_REGISTRY: Record<string, { name: string; lat: number; lon: number }[]> = {
         // --- GANGNAM 3-GU ---
-        '1171000000': [ // Songpa-gu (Full coverage - 13 points)
+        '1171000000': [ // Songpa-gu (Full coverage - 14 points)
             // 북부: 풍납/잠실/석촌
             { name: '풍납/잠실북', lat: 37.525, lon: 127.095 },
             { name: '잠실/신천', lat: 37.510, lon: 127.085 },
             { name: '석촌/송파', lat: 37.505, lon: 127.105 },
-            // 방이동: 1동/2동 분리 커버 (스크린샷 기준 매물 위치 반영)
-            { name: '방이2동(북)', lat: 37.518, lon: 127.122 },  // 방이2동 중심 (송파나루역 북쪽)
-            { name: '방이1동(남)', lat: 37.504, lon: 127.126 },  // 방이1동 중심 (방산초 인근) ← 누락 매물 위치
+            // 방이동: 올림픽선수기자촌(65+건), 1동/2동 분리 커버
+            { name: '올림픽선수기자촌', lat: 37.517, lon: 127.130 }, // 방이동 최대 단지 ← 방이2동 동쪽
+            { name: '방이2동(서)', lat: 37.516, lon: 127.118 },      // 방이2동 서쪽 단지 (송파나루역 인근)
+            { name: '방이1동(남)', lat: 37.504, lon: 127.126 },      // 방이1동 중심 (방산초 인근)
             // 중부: 오금/가락/헬리오
             { name: '오금/가락', lat: 37.497, lon: 127.118 },
             { name: '헬리오시티/가락', lat: 37.488, lon: 127.110 },
