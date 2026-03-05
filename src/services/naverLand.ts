@@ -350,23 +350,12 @@ export class NaverLandService {
      * These are used to generate one bbox URL per dong (no zoom-level omissions).
      */
     private DONG_CORTAR_REGISTRY: Record<string, { name: string; cortarNo: string; lat: number; lon: number }[]> = {
-        '1171000000': [ // Songpa-gu — 방이/문정 FIRST to avoid rate-limit miss
-            // ★ 우선 순위: 방이동/문정동을 맨 앞에 배치 (rate-limit 이전 요청)
-            { name: '방이동', cortarNo: '1171011100', lat: 37.517, lon: 127.128 }, // 올림픽선수기자촌 포함 북쪽
-            { name: '방이동남', cortarNo: '1171011100', lat: 37.506, lon: 127.126 }, // 방이1동 남쪽 매물
-            { name: '문정동', cortarNo: '1171010800', lat: 37.488, lon: 127.125 }, // 올림픽훼밀리/래미안
-            { name: '문정동동', cortarNo: '1171010800', lat: 37.483, lon: 127.136 }, // 문정래미안 동쪽
-            // 이하 나머지 동
-            { name: '잠실동', cortarNo: '1171010100', lat: 37.513, lon: 127.085 },
-            { name: '신천동', cortarNo: '1171010200', lat: 37.511, lon: 127.091 },
-            { name: '풍납동', cortarNo: '1171010300', lat: 37.527, lon: 127.107 },
-            { name: '송파동', cortarNo: '1171010400', lat: 37.504, lon: 127.110 },
-            { name: '석촌동', cortarNo: '1171010500', lat: 37.503, lon: 127.103 },
-            { name: '가락동', cortarNo: '1171010700', lat: 37.493, lon: 127.117 },
-            { name: '장지동', cortarNo: '1171010900', lat: 37.477, lon: 127.135 },
-            { name: '오금동', cortarNo: '1171011200', lat: 37.504, lon: 127.135 },
-            { name: '거여동', cortarNo: '1171011300', lat: 37.499, lon: 127.148 },
-            { name: '마천동', cortarNo: '1171011400', lat: 37.490, lon: 127.155 },
+        '1171000000': [ // Songpa-gu — 정밀 타격 모드 (방이/문정 집중)
+            // ★ 에러 최소화를 위해 가장 핵심적인 4개 포인트만 전송
+            { name: '방이동(선수촌)', cortarNo: '1171011100', lat: 37.517, lon: 127.130 }, // 올림픽선수기자촌 중심
+            { name: '방이동(남)', cortarNo: '1171011100', lat: 37.509, lon: 127.126 },   // 방이동 남쪽
+            { name: '문정동(훼밀리)', cortarNo: '1171010800', lat: 37.492, lon: 127.125 }, // 올림픽훼밀리
+            { name: '문정동(래미안)', cortarNo: '1171010800', lat: 37.485, lon: 127.135 }, // 문정래미안
         ],
         '1168000000': [ // Gangnam-gu
             { name: '역삼동', cortarNo: '1168010100', lat: 37.500, lon: 127.037 },
@@ -481,7 +470,7 @@ export class NaverLandService {
                     params.append('reitId', '');
                     params.append('rletTpCd', 'APT:ABYG:JGC');
                     params.append('tradTpCd', criteria.tradeType || 'A1');
-                    params.append('z', '15'); // z=15 shows individual listings better than z=14 clusters
+                    params.append('z', '16'); // z=16 for even better individual listing resolution
                     params.append('lat', String(lat.toFixed(7)));
                     params.append('lon', String(lon.toFixed(7)));
                     params.append('btm', String(btm.toFixed(7)));
