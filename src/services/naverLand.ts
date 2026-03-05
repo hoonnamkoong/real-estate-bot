@@ -469,8 +469,8 @@ export class NaverLandService {
                 const top = lat + subBoxSize;
                 const lft = lon - subBoxSize;
                 const rgt = lon + subBoxSize;
-                // Use per-dong cortarNo if available (DONG_CORTAR_REGISTRY), else use parent gu code
-                const effectiveCortarNo = (point as any).cortarNo || cortarNo;
+                // IMPORTANT: Keep cortNo as parent gu code (e.g. 1171000000)
+                // Using dong-level cortarNo caused 307 redirects from Naver API
 
                 // Request pages 1 to 5 to capture up to 100 items per box without truncating
                 for (let page = 1; page <= 5; page++) {
@@ -486,7 +486,7 @@ export class NaverLandService {
                     params.append('top', String(top.toFixed(7)));
                     params.append('rgt', String(rgt.toFixed(7)));
                     params.append('pgr', String(page));
-                    params.append('cortNo', effectiveCortarNo); // ← KEY FIX: use dong-level code
+                    params.append('cortNo', cortarNo); // gu-level code only — dong code causes 307
 
                     if (criteria.priceMax) params.append('dprcMax', String(criteria.priceMax)); // Mobile unit is 만원
                     if (criteria.areaMin) params.append('spcMin', String(Math.floor(criteria.areaMin)));
