@@ -57,17 +57,25 @@ export default function App() {
               headers: {
                 'User-Agent': isPC
                   ? 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
-                  : 'Mozilla/5.0 (Linux; Android 13; SM-S908B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Mobile Safari/537.36',
-                'Referer': isPC
-                  ? 'https://new.land.naver.com/'
-                  : 'https://m.land.naver.com/',
+                  : 'Mozilla/5.0 (Linux; Android 14; SM-S928B Build/UP1A.231005.007) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.6613.127 Mobile Safari/537.36 NaverApp/12.5.0',
+                'Referer': 'https://m.land.naver.com/map/entry/apt',
                 'Accept': 'application/json, text/plain, */*',
-                'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
-                'X-Requested-With': 'XMLHttpRequest'
+                'Accept-Language': 'ko-KR,ko;q=0.9',
+                'X-Requested-With': 'XMLHttpRequest',
+                'Cache-Control': 'no-cache',
+                'Pragma': 'no-cache'
               }
             });
+
+            // Check content-type before attempting JSON parse
+            // (after redirect, Naver might return HTML login page with 200)
+            const contentType = res.headers.get('content-type') || '';
             if (!res.ok) {
               addLog(`❌ 응답 실패 (${res.status}): ${url.substring(0, 40)}...`);
+              return [];
+            }
+            if (!contentType.includes('application/json') && !contentType.includes('text/plain')) {
+              addLog(`⚠️ 비JSON 응답 (${res.status}): 인증 필요 감지`);
               return [];
             }
             const json = await res.json();
