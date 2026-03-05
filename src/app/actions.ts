@@ -59,9 +59,10 @@ export async function searchProperties(data: FilterValues): Promise<Property[]> 
 
             // Trigger Android Phone via Join Webhook to wake up and run the app
             // FORCE use the newly provided URL, ignoring any stale Vercel env var
-            const webhookUrl = 'https://joinjoaomgcd.appspot.com/_ah/api/messaging/v1/sendPush?apikey=f78d04c55f3c4d378233c629a08cc669&text=run_proxy&deviceId=2914080424af4b78acab862f02787791';
+            // Cache bypass logic added: append timestamp and set no-store to ensure Tasker receives every signal
+            const webhookUrl = `https://joinjoaomgcd.appspot.com/_ah/api/messaging/v1/sendPush?apikey=f78d04c55f3c4d378233c629a08cc669&text=run_proxy&deviceId=2914080424af4b78acab862f02787791&t=${Date.now()}`;
             console.log(`[searchProperties] Triggering phone via Join Webhook...`);
-            await fetch(webhookUrl).catch(e => console.error('Join Webhook failed:', e));
+            await fetch(webhookUrl, { cache: 'no-store' }).catch(e => console.error('Join Webhook failed:', e));
 
             // Give the phone 2 seconds to turn on screen and launch the app before inserting the job
             await new Promise(resolve => setTimeout(resolve, 2000));
