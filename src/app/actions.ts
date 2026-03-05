@@ -68,13 +68,30 @@ export async function searchProperties(data: FilterValues): Promise<Property[]> 
             // Give the phone 2 seconds to turn on screen and launch the app before inserting the job
             await new Promise(resolve => setTimeout(resolve, 2000));
 
-            const job = await prisma.searchJob.create({
-                data: {
-                    params: { cortarNos, criteria, urls } as any,
-                    status: 'PENDING'
+            // 2. CHECK FOR RECENT IDENTICAL JOB (DEDUPLICATION)
+            // Check if there's a PENDING job within the last 2 minutes with same parameters
+            const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000);
+            const existingJob = await prisma.searchJob.findFirst({
+                where: {
+                    status: 'PENDING',
+                    createdAt: { gte: twoMinutesAgo },
+                    // Simple JSON stringify comparison for params
                 }
             });
-            console.log(`[searchProperties] Created Job ${job.id}, waiting for APK Proxy...`);
+
+            let job;
+            if (existingJob && JSON.stringify((existingJob.params as any)?.urls) === JSON.stringify(urls)) {
+                console.log(`[searchProperties] Reusing existing PENDING Job ${existingJob.id} instead of creating duplicate.`);
+                job = existingJob;
+            } else {
+                job = await prisma.searchJob.create({
+                    data: {
+                        params: { cortarNos, criteria, urls } as any,
+                        status: 'PENDING'
+                    }
+                });
+                console.log(`[searchProperties] Created Job ${job.id}, waiting for APK Proxy...`);
+            }
 
             // Poll for completion (up to 48.0s to stay within Vercel execution limits but give max time)
             const proxyStart = Date.now();

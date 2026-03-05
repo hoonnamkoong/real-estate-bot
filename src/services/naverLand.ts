@@ -354,8 +354,8 @@ export class NaverLandService {
             // ★ 에러 최소화를 위해 가장 핵심적인 4개 포인트만 전송
             { name: '방이동(선수촌)', cortarNo: '1171011100', lat: 37.517, lon: 127.130 }, // 올림픽선수기자촌 중심
             { name: '방이동(남)', cortarNo: '1171011100', lat: 37.509, lon: 127.126 },   // 방이동 남쪽
-            { name: '문정동(훼밀리)', cortarNo: '1171010800', lat: 37.492, lon: 127.125 }, // 올림픽훼밀리
-            { name: '문정동(래미안)', cortarNo: '1171010800', lat: 37.485, lon: 127.135 }, // 문정래미안
+            { name: '문정동(훼밀리)', cortarNo: '1171010800', lat: 37.489, lon: 127.125 }, // 올림픽훼밀리 (크로바 커버를 위해 약간 하향 37.492->37.489)
+            { name: '문정동(래미안)', cortarNo: '1171010800', lat: 37.486, lon: 127.135 }, // 문정래미안
         ],
         '1168000000': [ // Gangnam-gu
             { name: '역삼동', cortarNo: '1168010100', lat: 37.500, lon: 127.037 },
@@ -470,7 +470,7 @@ export class NaverLandService {
                     params.append('reitId', '');
                     params.append('rletTpCd', 'APT:ABYG:JGC');
                     params.append('tradTpCd', criteria.tradeType || 'A1');
-                    params.append('z', '16'); // z=16 for even better individual listing resolution
+                    params.append('z', '15'); // z=15 shows individual listings better than z=14 while covering more area than z=16
                     params.append('lat', String(lat.toFixed(7)));
                     params.append('lon', String(lon.toFixed(7)));
                     params.append('btm', String(btm.toFixed(7)));
