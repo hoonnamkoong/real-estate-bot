@@ -53,15 +53,17 @@ export default function App() {
           try {
             const isPC = url.includes('new.land.naver.com');
             const res = await fetch(url, {
+              redirect: 'follow',
               headers: {
                 'User-Agent': isPC
                   ? 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
-                  : 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
+                  : 'Mozilla/5.0 (Linux; Android 13; SM-S908B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Mobile Safari/537.36',
                 'Referer': isPC
                   ? 'https://new.land.naver.com/'
                   : 'https://m.land.naver.com/',
                 'Accept': 'application/json, text/plain, */*',
-                'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7'
+                'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
+                'X-Requested-With': 'XMLHttpRequest'
               }
             });
             if (!res.ok) {
