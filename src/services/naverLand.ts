@@ -435,8 +435,8 @@ export class NaverLandService {
 
         for (const cortarNo of cortarNos) {
             let searchPoints: { name: string, lat: number, lon: number }[] = [];
-            // Refined bbox tracking specific Dong centers tightly (approx 1.2km)
-            const subBoxSize = 0.007;
+            // Restore bbox tracking to 0.015 (3km) to overlap with registered valid center tiles
+            const subBoxSize = 0.015;
 
             if (this.DONG_CORTAR_REGISTRY[cortarNo]) {
                 searchPoints = this.DONG_CORTAR_REGISTRY[cortarNo];
@@ -444,9 +444,9 @@ export class NaverLandService {
                 searchPoints = this.DONG_REGISTRY[cortarNo];
             } else {
                 const { lat: centerLat, lon: centerLon } = this.getRegionCoords(cortarNo);
-                const gridSize = 6;
-                const step = 0.012;
-                const startOffset = -0.03;
+                const gridSize = 4;
+                const step = 0.03;
+                const startOffset = -0.045;
                 for (let i = 0; i < gridSize; i++) {
                     for (let j = 0; j < gridSize; j++) {
                         searchPoints.push({
@@ -465,8 +465,8 @@ export class NaverLandService {
                 const lft = lon - subBoxSize;
                 const rgt = lon + subBoxSize;
 
-                // Request pages 1 to 2 to capture up to 40 items perfectly bound within the exact dong radius
-                for (let page = 1; page <= 2; page++) {
+                // Request pages 1 to 5 to capture up to 100 items per box without truncating
+                for (let page = 1; page <= 5; page++) {
                     const params = new URLSearchParams();
                     params.append('reitId', '');
                     params.append('rletTpCd', 'APT:ABYG:JGC');
