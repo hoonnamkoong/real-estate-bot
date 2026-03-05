@@ -69,9 +69,18 @@ export default function App() {
               return [];
             }
             const json = await res.json();
-            if (Array.isArray(json.body)) return json.body;
-            if (Array.isArray(json.articleList)) return json.articleList;
-            return [];
+            let rawList: any[] = [];
+            if (Array.isArray(json.body)) rawList = json.body;
+            else if (Array.isArray(json.articleList)) rawList = json.articleList;
+
+            // TRIM PAYLOAD TO PREVENT VERCEL 4.5MB LIMIT ERROR
+            return rawList.map((item: any) => ({
+              atclNo: item.atclNo,
+              cortarNo: String(item.cortarNo || ''),
+              spc1: item.spc1,
+              prc: item.prc,
+              atclNm: item.atclNm
+            }));
           } catch (e) {
             return [];
           }
