@@ -89,7 +89,8 @@ export default function App() {
       allItems.push(...batchResults.flat());
       // Prevent Naver 429 Too Many Requests by waiting between batches
       if (i + 8 < urls.length) {
-        await new Promise(resolve => setTimeout(resolve, 500));
+        addLog(`⏳ 다음 배치를 위해 1초 대기 중...`);
+        await new Promise(resolve => setTimeout(resolve, 1000));
       }
     }
 
