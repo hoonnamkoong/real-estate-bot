@@ -435,15 +435,18 @@ export class NaverLandService {
 
         for (const cortarNo of cortarNos) {
             let searchPoints: { name: string, lat: number, lon: number }[] = [];
-            const subBoxSize = 0.04;
+            // Make bbox smaller to fit within 20 items per page more accurately, or rely on pagination
+            const subBoxSize = 0.015; // roughly 3km x 3km box
 
-            if (this.DONG_REGISTRY[cortarNo]) {
+            if (this.DONG_CORTAR_REGISTRY[cortarNo]) {
+                searchPoints = this.DONG_CORTAR_REGISTRY[cortarNo];
+            } else if (this.DONG_REGISTRY[cortarNo]) {
                 searchPoints = this.DONG_REGISTRY[cortarNo];
             } else {
                 const { lat: centerLat, lon: centerLon } = this.getRegionCoords(cortarNo);
                 const gridSize = 4;
-                const step = 0.04;
-                const startOffset = -0.06;
+                const step = 0.03;
+                const startOffset = -0.045;
                 for (let i = 0; i < gridSize; i++) {
                     for (let j = 0; j < gridSize; j++) {
                         searchPoints.push({
@@ -462,30 +465,36 @@ export class NaverLandService {
                 const lft = lon - subBoxSize;
                 const rgt = lon + subBoxSize;
 
-                const params = new URLSearchParams();
-                params.append('reitId', '');
-                params.append('rletTpCd', 'APT:ABYG:JGC');
-                params.append('tradTpCd', criteria.tradeType || 'A1');
-                params.append('z', '14');
-                params.append('lat', String(lat.toFixed(7)));
-                params.append('lon', String(lon.toFixed(7)));
-                params.append('btm', String(btm.toFixed(7)));
-                params.append('lft', String(lft.toFixed(7)));
-                params.append('top', String(top.toFixed(7)));
-                params.append('rgt', String(rgt.toFixed(7)));
-                params.append('pgr', '1');
-                params.append('cortNo', cortarNo);
+                // Request pages 1 to 4 to ensure we don't cap at 20 items per dense dong (e.g. Pungnap-dong)
+                for (let page = 1; page <= 4; page++) {
+                    const params = new URLSearchParams();
+                    params.append('reitId', '');
+                    params.append('rletTpCd', 'APT:ABYG:JGC');
+                    params.append('tradTpCd', criteria.tradeType || 'A1');
+                    params.append('z', '14');
+                    params.append('lat', String(lat.toFixed(7)));
+                    params.append('lon', String(lon.toFixed(7)));
+                    params.append('btm', String(btm.toFixed(7)));
+                    params.append('lft', String(lft.toFixed(7)));
+                    params.append('top', String(top.toFixed(7)));
+                    params.append('rgt', String(rgt.toFixed(7)));
+                    params.append('pgr', String(page));
+                    params.append('cortNo', cortarNo);
 
-                if (criteria.priceMax) params.append('dprcMax', String(criteria.priceMax)); // Mobile unit is 만원
-                if (criteria.areaMin) params.append('spcMin', String(Math.floor(criteria.areaMin)));
-                if (criteria.areaMax) params.append('spcMax', String(Math.ceil(criteria.areaMax)));
-                else params.append('spcMax', '900000000'); // Required otherwise spcMin is ignored sometimes
+                    if (criteria.priceMax) params.append('dprcMax', String(criteria.priceMax)); // Mobile unit is 만원
+                    if (criteria.areaMin) params.append('spcMin', String(Math.floor(criteria.areaMin)));
+                    if (criteria.areaMax) params.append('spcMax', String(Math.ceil(criteria.areaMax)));
+                    else params.append('spcMax', '900000000'); // Required otherwise spcMin is ignored sometimes
 
-                if (criteria.roomCount && criteria.roomCount >= 4) params.append('tag', 'FOURROOM');
+                    if (criteria.roomCount && criteria.roomCount >= 4) {
+                        params.append('tag', 'FOURROOM');
+                    }
 
-                urls.push(`${NAVER_LAND_MOBILE_BBOX_API}?${params.toString()}`);
+                    urls.push(`${NAVER_LAND_MOBILE_BBOX_API}?${params.toString()}`);
+                }
             }
         }
+
         return urls;
     }
 
