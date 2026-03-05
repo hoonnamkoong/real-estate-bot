@@ -45,9 +45,9 @@ export default function App() {
     addLog(`🔍 무차단망 이용 접속: ${urls.length} 포인트 스캔 중...`);
     const allItems: any[] = [];
 
-    // Fetch in chunks of 4 to save Android memory/network
-    for (let i = 0; i < urls.length; i += 4) {
-      const batch = urls.slice(i, i + 4);
+    // Fetch in chunks of 8 to save Android memory/network
+    for (let i = 0; i < urls.length; i += 8) {
+      const batch = urls.slice(i, i + 8);
       const batchResults = await Promise.all(
         batch.map(async (url) => {
           try {
@@ -79,8 +79,8 @@ export default function App() {
       );
       allItems.push(...batchResults.flat());
       // Prevent Naver 429 Too Many Requests by waiting between batches
-      if (i + 4 < urls.length) {
-        await new Promise(resolve => setTimeout(resolve, 1500));
+      if (i + 8 < urls.length) {
+        await new Promise(resolve => setTimeout(resolve, 500));
       }
     }
 
