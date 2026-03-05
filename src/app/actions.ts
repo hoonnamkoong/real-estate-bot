@@ -128,7 +128,18 @@ export async function searchProperties(data: FilterValues): Promise<Property[]> 
         // 4. No client-side filtering — Naver already filtered by prc and spc1 in the URL
         // Just pass through all mapped results
         console.log(`[searchProperties] Total results from Naver proxy: ${results.length}`);
-        const filtered = results.filter((item: any) => item && item.id !== 'TIMEOUT_ERR' ? true : item?.id === 'TIMEOUT_ERR');
+
+        const validGuPrefixes = cortarNos.map(code => code.substring(0, 5));
+
+        const filtered = results.filter((item: any) => {
+            if (item?.id === 'TIMEOUT_ERR') return true;
+            if (!item) return false;
+            // Filter out properties from adjacent districts that were caught in the wider BBox
+            if (item.cortarNo && !validGuPrefixes.includes(String(item.cortarNo).substring(0, 5))) {
+                return false;
+            }
+            return true;
+        });
 
 
         // 5. Send Telegram Notification (Async)

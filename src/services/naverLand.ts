@@ -675,7 +675,8 @@ export class NaverLandService {
                 link: item.atclNo ? `https://m.land.naver.com/article/info/${item.atclNo}` : '#',
                 note: undefined,
                 _rawPrice: price,
-                dongName: item._dongName || '-'
+                dongName: item._dongName || '-',
+                cortarNo: item.cortarNo || ''
             };
         });
 
