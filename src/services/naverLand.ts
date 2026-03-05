@@ -465,8 +465,8 @@ export class NaverLandService {
                 const lft = lon - subBoxSize;
                 const rgt = lon + subBoxSize;
 
-                // Request pages 1 to 4 to ensure we don't cap at 20 items per dense dong (e.g. Pungnap-dong)
-                for (let page = 1; page <= 4; page++) {
+                // Request pages 1 to 3 to ensure we don't cap at 20 items per dense dong while keeping URLs reasonable
+                for (let page = 1; page <= 3; page++) {
                     const params = new URLSearchParams();
                     params.append('reitId', '');
                     params.append('rletTpCd', 'APT:ABYG:JGC');

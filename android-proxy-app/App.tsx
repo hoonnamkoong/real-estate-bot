@@ -78,6 +78,10 @@ export default function App() {
         })
       );
       allItems.push(...batchResults.flat());
+      // Prevent Naver 429 Too Many Requests by waiting between batches
+      if (i + 4 < urls.length) {
+        await new Promise(resolve => setTimeout(resolve, 1500));
+      }
     }
 
     addLog(`✅ 스캔 완료: 원천 데이터 ${allItems.length}건 수집`);
