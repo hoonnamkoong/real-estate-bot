@@ -17,21 +17,25 @@ export class NaverLandService {
     // Dong Coordinates Registry (Approximate Centers)
     private DONG_REGISTRY: Record<string, { name: string; lat: number; lon: number }[]> = {
         // --- GANGNAM 3-GU ---
-        '1171000000': [ // Songpa-gu (Full coverage - 10 points)
+        '1171000000': [ // Songpa-gu (Full coverage - 13 points)
             // 북부: 풍납/잠실/석촌
             { name: '풍납/잠실북', lat: 37.525, lon: 127.095 },
             { name: '잠실/신천', lat: 37.510, lon: 127.085 },
             { name: '석촌/송파', lat: 37.505, lon: 127.105 },
-            // 중부: 방이/오금/가락
-            { name: '방이/오금', lat: 37.510, lon: 127.125 },
-            { name: '가락/문정', lat: 37.492, lon: 127.118 },
-            { name: '문정/장지', lat: 37.480, lon: 127.130 },
+            // 방이동: 1동/2동 분리 커버 (스크린샷 기준 매물 위치 반영)
+            { name: '방이2동(북)', lat: 37.518, lon: 127.122 },  // 방이2동 중심 (송파나루역 북쪽)
+            { name: '방이1동(남)', lat: 37.504, lon: 127.126 },  // 방이1동 중심 (방산초 인근) ← 누락 매물 위치
+            // 중부: 오금/가락/헬리오
+            { name: '오금/가락', lat: 37.497, lon: 127.118 },
+            { name: '헬리오시티/가락', lat: 37.488, lon: 127.110 },
+            // 문정동: 단지 밀집 구역
+            { name: '문정1동(올림픽훼밀리)', lat: 37.490, lon: 127.125 }, // 올림픽훼밀리타운 인근
+            { name: '문정2동(래미안)', lat: 37.484, lon: 127.135 },       // 문정래미안 인근
             // 동부: 거여/마천
             { name: '거여', lat: 37.498, lon: 127.145 },
             { name: '마천', lat: 37.488, lon: 127.155 },
-            // 남부: 세곡/위례
-            { name: '위례/장지북', lat: 37.470, lon: 127.130 },
-            { name: '헬리오시티/가락', lat: 37.488, lon: 127.110 },
+            // 남부: 장지/위례
+            { name: '장지/위례', lat: 37.472, lon: 127.130 },
         ],
         '1168000000': [ // Gangnam-gu
             { name: '압구정1(구현대)', lat: 37.530, lon: 127.028 },
