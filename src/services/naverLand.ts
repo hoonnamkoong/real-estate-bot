@@ -440,8 +440,8 @@ export class NaverLandService {
 
         for (const cortarNo of cortarNos) {
             let searchPoints: { name: string, lat: number, lon: number }[] = [];
-            // Restore bbox tracking to 0.015 (3km) to overlap with registered valid center tiles
-            const subBoxSize = 0.015;
+            // Restore bbox tracking to 0.025 (~2.5km) for better coverage of dense areas
+            const subBoxSize = 0.025;
 
             if (this.DONG_CORTAR_REGISTRY[cortarNo]) {
                 searchPoints = this.DONG_CORTAR_REGISTRY[cortarNo];
