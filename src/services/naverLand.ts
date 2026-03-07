@@ -510,8 +510,9 @@ export class NaverLandService {
                         complexes = [...apts.slice(0, 5), ...opsts.slice(0, 2)];
                     } else if (dongs.length <= 2) {
                         // Single/Double Dong Search (e.g. searching only Jamsil-dong)
-                        // Limiting to 30 complexes to ensure "No Filter" scenario completes within 100s
-                        complexes = complexes.slice(0, 30);
+                        // Extremely Tight Limit for "No Filter" scenario to ensure 100s completion
+                        // 10 complexes is enough to prove the dong has results while staying fast.
+                        complexes = complexes.slice(0, 10);
                     }
 
                     for (const complex of complexes) {
