@@ -498,10 +498,20 @@ export class NaverLandService {
                     let complexes = await this.getComplexesByDong(cortarNo);
                     console.log(`[generateProxyUrls] Dong ${cortarNo}: Found ${complexes.length} complexes`);
 
-                    // Optimization for large regions: limit complexes per dong to avoid timeout (95s limit)
-                    // If searching multiple dongs (e.g. whole Gu), take top 15 by household count
+                    // Optimization for large regions: Represent each dong with its top complexes to avoid timeout
+                    // Songpa-gu can have 20+ dongs, each with 100+ complexes. 100s limit is tight.
                     if (dongs.length > 2) {
-                        complexes = complexes.slice(0, 15);
+                        // High-Priority Scan: Top 5 APT + Top 2 OPST per dong to ensure total URLs < 200
+                        const apts = complexes.filter(c => ['A01', 'APT', 'ABYG', 'JGC'].includes(c.realEstateTypeCode))
+                            .sort((a, b) => (b.totalHouseholdCount || 0) - (a.totalHouseholdCount || 0));
+                        const opsts = complexes.filter(c => ['OPST', 'OR'].includes(c.realEstateTypeCode))
+                            .sort((a, b) => (b.totalHouseholdCount || 0) - (a.totalHouseholdCount || 0));
+
+                        complexes = [...apts.slice(0, 5), ...opsts.slice(0, 2)];
+                    } else if (dongs.length <= 2) {
+                        // Single/Double Dong Search (e.g. searching only Jamsil-dong)
+                        // Limiting to 30 complexes to ensure "No Filter" scenario completes within 100s
+                        complexes = complexes.slice(0, 30);
                     }
 
                     for (const complex of complexes) {
