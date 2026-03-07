@@ -486,7 +486,7 @@ export class NaverLandService {
 
         const urls: string[] = [];
         const dongs = Array.from(expandedCortarNos);
-        const batchSize = 3; // Revert to conservative 3 to avoid triggering CAPTCHA on Vercel
+        const batchSize = 10; // Discovery is safe to parallelize more aggressively
 
         console.log(`[generateProxyUrls] Start scanning ${dongs.length} dongs with batchSize ${batchSize}`);
 
@@ -495,8 +495,14 @@ export class NaverLandService {
 
             await Promise.all(batch.map(async (cortarNo) => {
                 try {
-                    const complexes = await this.getComplexesByDong(cortarNo);
+                    let complexes = await this.getComplexesByDong(cortarNo);
                     console.log(`[generateProxyUrls] Dong ${cortarNo}: Found ${complexes.length} complexes`);
+
+                    // Optimization for large regions: limit complexes per dong to avoid timeout (95s limit)
+                    // If searching multiple dongs (e.g. whole Gu), take top 15 by household count
+                    if (dongs.length > 2) {
+                        complexes = complexes.slice(0, 15);
+                    }
 
                     for (const complex of complexes) {
                         // Filter complexes: Apartment (A01, APT, ABYG), Ju-sang-bok-hap (JGC), Officetel (OPST, OR)
