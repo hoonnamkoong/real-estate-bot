@@ -8,35 +8,32 @@ export interface SearchCriteria {
     areaMin?: number;
     areaMax?: number;
     roomCount?: number;
+    minHouseholds?: number;
 }
 
 const NAVER_LAND_MOBILE_HOST = 'https://m.land.naver.com';
+const NAVER_LAND_FIN_API_HOST = 'https://fin.land.naver.com';
 
 export class NaverLandService {
+    private COMPLEX_CACHE: Map<string, { totalHouseholdCount: number, name: string }> = new Map();
 
     // Dong Coordinates Registry (Approximate Centers)
     private DONG_REGISTRY: Record<string, { name: string; lat: number; lon: number }[]> = {
         // --- GANGNAM 3-GU ---
-        '1171000000': [ // Songpa-gu (Full coverage - 14 points)
-            // 북부: 풍납/잠실/석촌
-            { name: '풍납/잠실북', lat: 37.525, lon: 127.095 },
-            { name: '잠실/신천', lat: 37.510, lon: 127.085 },
-            { name: '석촌/송파', lat: 37.505, lon: 127.105 },
-            // 방이동: 올림픽선수기자촌(65+건), 1동/2동 분리 커버
-            { name: '올림픽선수기자촌', lat: 37.517, lon: 127.130 }, // 방이동 최대 단지 ← 방이2동 동쪽
-            { name: '방이2동(서)', lat: 37.516, lon: 127.118 },      // 방이2동 서쪽 단지 (송파나루역 인근)
-            { name: '방이1동(남)', lat: 37.504, lon: 127.126 },      // 방이1동 중심 (방산초 인근)
-            // 중부: 오금/가락/헬리오
-            { name: '오금/가락', lat: 37.497, lon: 127.118 },
-            { name: '헬리오시티/가락', lat: 37.488, lon: 127.110 },
-            // 문정동: 단지 밀집 구역
-            { name: '문정1동(올림픽훼밀리)', lat: 37.490, lon: 127.125 }, // 올림픽훼밀리타운 인근
-            { name: '문정2동(래미안)', lat: 37.484, lon: 127.135 },       // 문정래미안 인근
-            // 동부: 거여/마천
-            { name: '거여', lat: 37.498, lon: 127.145 },
-            { name: '마천', lat: 37.488, lon: 127.155 },
-            // 남부: 장지/위례
-            { name: '장지/위례', lat: 37.472, lon: 127.130 },
+        '1171000000': [ // Songpa-gu (Precision Dong Coverage)
+            { name: '잠실동', lat: 37.5055, lon: 127.0815 },
+            { name: '신천동', lat: 37.5191, lon: 127.1030 },
+            { name: '풍납동', lat: 37.5350, lon: 127.1150 },
+            { name: '송파동', lat: 37.5050, lon: 127.1100 },
+            { name: '석촌동', lat: 37.5050, lon: 127.1000 },
+            { name: '삼전동', lat: 37.5050, lon: 127.0900 },
+            { name: '가락동', lat: 37.4957, lon: 127.1218 },
+            { name: '문정동', lat: 37.4859, lon: 127.1218 },
+            { name: '장지동', lat: 37.4750, lon: 127.1350 },
+            { name: '방이동', lat: 37.5150, lon: 127.1250 },
+            { name: '오금동', lat: 37.5050, lon: 127.1300 },
+            { name: '거여동', lat: 37.4913, lon: 127.1477 },
+            { name: '마천동', lat: 37.4910, lon: 127.1530 }
         ],
         '1168000000': [ // Gangnam-gu
             { name: '압구정1(구현대)', lat: 37.530, lon: 127.028 },
@@ -350,12 +347,23 @@ export class NaverLandService {
      * These are used to generate one bbox URL per dong (no zoom-level omissions).
      */
     private DONG_CORTAR_REGISTRY: Record<string, { name: string; cortarNo: string; lat: number; lon: number }[]> = {
-        '1171000000': [ // Songpa-gu — 정밀 타격 모드 (방이/문정 집중)
-            // ★ 에러 최소화를 위해 가장 핵심적인 4개 포인트만 전송
-            { name: '방이동(선수촌)', cortarNo: '1171011100', lat: 37.517, lon: 127.130 }, // 올림픽선수기자촌 중심
-            { name: '방이동(남)', cortarNo: '1171011100', lat: 37.509, lon: 127.126 },   // 방이동 남쪽
-            { name: '문정동(훼밀리)', cortarNo: '1171010800', lat: 37.489, lon: 127.125 }, // 올림픽훼밀리 (크로바 커버를 위해 약간 하향 37.492->37.489)
-            { name: '문정동(래미안)', cortarNo: '1171010800', lat: 37.486, lon: 127.135 }, // 문정래미안
+        '1171000000': [ // Songpa-gu (Full coverage - 16 points for absolute completeness)
+            { name: '잠실동', cortarNo: '1171010100', lat: 37.510, lon: 127.085 },
+            { name: '신천동', cortarNo: '1171010200', lat: 37.519, lon: 127.103 }, // RESTORED
+            { name: '풍납동', cortarNo: '1171010300', lat: 37.525, lon: 127.115 },
+            { name: '송파동', cortarNo: '1171010400', lat: 37.505, lon: 127.110 }, // RESTORED
+            { name: '석촌동', cortarNo: '1171010500', lat: 37.505, lon: 127.105 },
+            { name: '삼전동', cortarNo: '1171010600', lat: 37.502, lon: 127.092 },
+            { name: '가락동(헬리오)', cortarNo: '1171010700', lat: 37.495, lon: 127.110 },
+            { name: '가락동(경찰병원)', cortarNo: '1171010700', lat: 37.495, lon: 127.121 },
+            { name: '문정동(훼밀리)', cortarNo: '1171010800', lat: 37.490, lon: 127.125 },
+            { name: '문정동(래미안)', cortarNo: '1171010800', lat: 37.484, lon: 127.135 },
+            { name: '장지동', cortarNo: '1171010900', lat: 37.472, lon: 127.130 },
+            { name: '방이동(서)', cortarNo: '1171011100', lat: 37.516, lon: 127.118 },
+            { name: '방이동(남)', cortarNo: '1171011100', lat: 37.504, lon: 127.126 },
+            { name: '오금동', cortarNo: '1171011200', lat: 37.502, lon: 127.130 },
+            { name: '거여동', cortarNo: '1171011300', lat: 37.495, lon: 127.145 },
+            { name: '마천동', cortarNo: '1171011400', lat: 37.495, lon: 127.155 },
         ],
         '1168000000': [ // Gangnam-gu
             { name: '역삼동', cortarNo: '1168010100', lat: 37.500, lon: 127.037 },
@@ -426,75 +434,160 @@ export class NaverLandService {
         ],
     };
 
-    generateProxyUrls(cortarNos: string[], criteria: SearchCriteria): string[] {
-        const urls: string[] = [];
-        const NAVER_LAND_MOBILE_BBOX_API = 'https://m.land.naver.com/cluster/ajax/articleList';
+    private async fetchWithRetry(url: string, options: any, retries = 2): Promise<Response | null> {
+        const headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Referer': 'https://fin.land.naver.com/',
+            'Accept': 'application/json, text/plain, */*',
+            'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache',
+            ...options.headers
+        };
 
-        for (const cortarNo of cortarNos) {
-            let searchPoints: { name: string, lat: number, lon: number, cortarNo?: string }[] = [];
-            // 0.015 (~1.5km): proven working range, reduces 307 overlap risk
-            const subBoxSize = 0.015;
-
-            if (this.DONG_CORTAR_REGISTRY[cortarNo]) {
-                searchPoints = this.DONG_CORTAR_REGISTRY[cortarNo];
-            } else if (this.DONG_REGISTRY[cortarNo]) {
-                searchPoints = this.DONG_REGISTRY[cortarNo];
-            } else {
-                const { lat: centerLat, lon: centerLon } = this.getRegionCoords(cortarNo);
-                const gridSize = 4;
-                const step = 0.03;
-                const startOffset = -0.045;
-                for (let i = 0; i < gridSize; i++) {
-                    for (let j = 0; j < gridSize; j++) {
-                        searchPoints.push({
-                            name: `Grid_${i}_${j}`,
-                            lat: centerLat + startOffset + (i * step),
-                            lon: centerLon + startOffset + (j * step)
-                        });
-                    }
+        for (let i = 0; i <= retries; i++) {
+            try {
+                const response = await fetch(url, { ...options, headers });
+                if (response.ok) return response;
+                if (response.status === 429 || response.status === 503) {
+                    console.log(`[fetchWithRetry] Rate limited (Status: ${response.status}). Retrying... (${i + 1}/${retries})`);
+                    await new Promise(r => setTimeout(r, 1000 * (i + 1))); // Exponential backoff
+                    continue;
                 }
+                return response;
+            } catch (e) {
+                if (i === retries) throw e;
+                await new Promise(r => setTimeout(r, 1000 * (i + 1)));
             }
+        }
+        return null;
+    }
 
-            for (const point of searchPoints) {
-                const { lat, lon } = point;
-                const btm = lat - subBoxSize;
-                const top = lat + subBoxSize;
-                const lft = lon - subBoxSize;
-                const rgt = lon + subBoxSize;
-                // IMPORTANT: Keep cortNo as parent gu code (e.g. 1171000000)
-                // Using dong-level cortarNo caused 307 redirects from Naver API
+    async generateProxyUrls(cortarNos: string[], criteria: SearchCriteria): Promise<string[]> {
+        const expandedCortarNos = new Set<string>();
+        const dongMeta: Record<string, { lat: number, lon: number }> = {};
 
-                // Pages 1-2 only — page 3+ often returns 307 (empty page redirect)
-                for (let page = 1; page <= 2; page++) {
-                    const params = new URLSearchParams();
-                    params.append('reitId', '');
-                    params.append('rletTpCd', 'APT:ABYG:JGC');
-                    params.append('tradTpCd', criteria.tradeType || 'A1');
-                    params.append('z', '15'); // z=15 shows individual listings better than z=14 while covering more area than z=16
-                    params.append('lat', String(lat.toFixed(7)));
-                    params.append('lon', String(lon.toFixed(7)));
-                    params.append('btm', String(btm.toFixed(7)));
-                    params.append('lft', String(lft.toFixed(7)));
-                    params.append('top', String(top.toFixed(7)));
-                    params.append('rgt', String(rgt.toFixed(7)));
-                    params.append('pgr', String(page));
-                    params.append('cortNo', cortarNo); // gu-level code only — dong code causes 307
-
-                    if (criteria.priceMax) params.append('dprcMax', String(criteria.priceMax)); // Mobile unit is 만원
-                    if (criteria.areaMin) params.append('spcMin', String(Math.floor(criteria.areaMin)));
-                    if (criteria.areaMax) params.append('spcMax', String(Math.ceil(criteria.areaMax)));
-                    else params.append('spcMax', '900000000'); // Required otherwise spcMin is ignored sometimes
-
-                    if (criteria.roomCount && criteria.roomCount >= 4) {
-                        params.append('tag', 'FOURROOM');
+        // Expansion logic: If a Gu code is provided (ending in 000000), expand to its Dongs
+        for (const code of cortarNos) {
+            if (this.DONG_CORTAR_REGISTRY[code]) {
+                this.DONG_CORTAR_REGISTRY[code].forEach(d => {
+                    expandedCortarNos.add(d.cortarNo);
+                    if (!dongMeta[d.cortarNo]) {
+                        dongMeta[d.cortarNo] = { lat: d.lat, lon: d.lon };
                     }
-
-                    urls.push(`${NAVER_LAND_MOBILE_BBOX_API}?${params.toString()}`);
+                });
+            } else {
+                expandedCortarNos.add(code);
+                if (!dongMeta[code]) {
+                    dongMeta[code] = this.getRegionCoords(code);
                 }
             }
         }
 
+        const urls: string[] = [];
+        const dongs = Array.from(expandedCortarNos);
+        const batchSize = 3; // Revert to conservative 3 to avoid triggering CAPTCHA on Vercel
+
+        console.log(`[generateProxyUrls] Start scanning ${dongs.length} dongs with batchSize ${batchSize}`);
+
+        for (let i = 0; i < dongs.length; i += batchSize) {
+            const batch = dongs.slice(i, i + batchSize);
+
+            await Promise.all(batch.map(async (cortarNo) => {
+                try {
+                    const complexes = await this.getComplexesByDong(cortarNo);
+                    console.log(`[generateProxyUrls] Dong ${cortarNo}: Found ${complexes.length} complexes`);
+
+                    for (const complex of complexes) {
+                        // Filter complexes: Apartment (A01, APT, ABYG), Ju-sang-bok-hap (JGC), Officetel (OPST, OR)
+                        const isApartment = ['A01', 'APT', 'ABYG', 'JGC', 'OPST', 'OR'].includes(complex.realEstateTypeCode);
+                        if (!isApartment) continue;
+
+                        // Household Filter (e.g. 100+)
+                        if (criteria.minHouseholds && complex.totalHouseholdCount < criteria.minHouseholds) continue;
+
+                        const complexNo = String(complex.complexNumber);
+                        const complexName = complex.complexName;
+
+                        // Store in cache for mapping phase
+                        this.COMPLEX_CACHE.set(complexNo, {
+                            totalHouseholdCount: complex.totalHouseholdCount,
+                            name: complexName
+                        });
+
+                        // Bbox generation: Use complex center if available, else dong center
+                        const lat = complex.lat || dongMeta[cortarNo]?.lat || 37.514;
+                        const lon = complex.lon || dongMeta[cortarNo]?.lon || 127.105;
+
+                        // Sub-complexes capture (radius ~1.5km)
+                        const btm = lat - 0.015;
+                        const top = lat + 0.015;
+                        const lft = lon - 0.015;
+                        const rgt = lon + 0.015;
+
+                        // Max 1 page per complex to stay within 48s limit
+                        const params = new URLSearchParams();
+                        params.append('itemId', complexNo);
+                        params.append('rletTpCd', 'APT:ABYG:JGC:OPST');
+                        params.append('tradTpCd', criteria.tradeType === 'B1' ? 'A1:B1' : criteria.tradeType === 'B2' ? 'A1:B2' : criteria.tradeType || 'A1');
+                        params.append('z', '16');
+                        params.append('lat', lat.toString());
+                        params.append('lon', lon.toString());
+                        params.append('btm', btm.toString());
+                        params.append('lft', lft.toString());
+                        params.append('top', top.toString());
+                        params.append('rgt', rgt.toString());
+                        params.append('page', '1');
+                        params.append('addon', 'COMPLEX');
+                        params.append('cortarNo', cortarNo);
+
+                        // Serverside early filter
+                        if (criteria.priceMax) params.append('dprcMax', String(criteria.priceMax));
+                        if (criteria.areaMin) params.append('spcMin', String(Math.floor(criteria.areaMin)));
+
+                        const finalUrl = `${NAVER_LAND_MOBILE_HOST}/cluster/ajax/articleList?${params.toString()}`;
+                        urls.push(finalUrl);
+                    }
+                } catch (e) {
+                    console.error(`[generateProxyUrls] Error processing dong ${cortarNo}:`, e);
+                }
+            }));
+        }
+
+        console.log(`[generateProxyUrls] Produced ${urls.length} target URLs`);
         return urls;
+    }
+
+    /**
+     * Get list of complexes in a specific Dong via fin.land.naver.com API
+     */
+    async getComplexesByDong(cortarNo: string): Promise<any[]> {
+        const url = `https://fin.land.naver.com/front-api/v1/complex/region?eupLegalDivisionNumber=${cortarNo}&size=500&sortType=HOUSEHOLD&page=0`;
+
+        try {
+            const response = await this.fetchWithRetry(url, { method: 'GET' });
+            if (!response || !response.ok) {
+                console.error(`[getComplexesByDong] Failed for ${cortarNo}: Status ${response?.status}`);
+                return [];
+            }
+            const json = await response.json();
+            const list = json?.result?.list || json?.result?.complexes || [];
+
+            return list.map((c: any) => {
+                const info = c.complexInfo || {};
+                return {
+                    complexNumber: info.complexNumber,
+                    complexName: info.name,
+                    realEstateTypeCode: info.type,
+                    totalHouseholdCount: info.totalHouseholdNumber || 0,
+                    lat: info.latitude,
+                    lon: info.longitude
+                };
+            });
+        } catch (e) {
+            console.error(`[getComplexesByDong] Error fetching for ${cortarNo}:`, e);
+            return [];
+        }
     }
 
 
@@ -535,20 +628,21 @@ export class NaverLandService {
 
             const fetchSubRegion = async (point: { name: string, lat: number, lon: number }) => {
                 const { lat, lon } = point;
-                const btm = lat - subBoxSize;
-                const top = lat + subBoxSize;
-                const lft = lon - subBoxSize;
-                const rgt = lon + subBoxSize;
+                // Use tighter bounding box (±0.005) for precision
+                const btm = lat - 0.005;
+                const top = lat + 0.005;
+                const lft = lon - 0.005;
+                const rgt = lon + 0.005;
 
                 const allSubItems: any[] = [];
-                const maxPages = 1; // Critical: Limit to 1 page for Vercel Hobby
+                const maxPages = 5; // Increased to 5 for better depth
 
                 for (let page = 1; page <= maxPages; page++) {
                     const params = new URLSearchParams();
                     params.append('cortarNo', cortarNo);
-                    params.append('rletTpCd', 'APT:ABYG:JGC');
+                    params.append('rletTpCd', 'APT:OP'); // Standard: Apartment & Officetel
                     params.append('tradTpCd', criteria.tradeType || 'A1');
-                    params.append('z', '15'); // Better zoom level for cluster search
+                    params.append('z', '14'); // High precision zoom (tested)
                     params.append('lat', String(lat));
                     params.append('lon', String(lon));
                     params.append('btm', String(btm.toFixed(7)));
@@ -558,13 +652,12 @@ export class NaverLandService {
                     params.append('page', String(page));
 
                     if (criteria.priceMax) params.append('prc', `0:${criteria.priceMax}`);
-                    // spcMin and rom removed from API params to simplify request
 
                     const apiUrl = `${NAVER_LAND_MOBILE_HOST}/cluster/ajax/articleList?${params.toString()}`;
 
                     try {
                         const controller = new AbortController();
-                        const timeoutId = setTimeout(() => controller.abort(), 4500); // Give enough time for direct call
+                        const timeoutId = setTimeout(() => controller.abort(), 8000); // 8s timeout
 
                         const response = await fetch(apiUrl, {
                             cache: 'no-store',
@@ -652,16 +745,42 @@ export class NaverLandService {
     }
 
     /**
-     * Parse raw Naver items (from Android Proxy) into Property array
+     * Parse raw Naver items (from Android Proxy) into Property array with optional criteria filtering
      */
-    mapNaverItemsToProperties(allItems: any[]): Property[] {
+    mapNaverItemsToProperties(allItems: any[], criteria?: SearchCriteria): Property[] {
         const uniqueMap = new Map();
 
         allItems.forEach((item: any) => {
             if (!uniqueMap.has(item.atclNo)) {
                 // Keep track of dongName if injected by proxy, else use DONG_CODE_MAP
                 const dongName = item._dongName || this.DONG_CODE_MAP[item.cortarNo] || '-';
-                uniqueMap.set(item.atclNo, { ...item, _dongName: dongName });
+
+                // Try to find complex-level household count from cache
+                // The GET API doesn't return complexNo/itemId in each item, so we fallback to Name matching
+                const complexId = item.complexNo || item.itemId || '';
+                let complexInfo = this.COMPLEX_CACHE.get(complexId);
+
+                if (!complexInfo && item.atclNm) {
+                    // Search all cache entries for a name match (simple but effective fallback)
+                    // We look for the longest match to be precise
+                    let bestMatch: any = null;
+                    for (const [id, info] of this.COMPLEX_CACHE.entries()) {
+                        if (item.atclNm.includes(info.name)) {
+                            if (!bestMatch || info.name.length > bestMatch.name.length) {
+                                bestMatch = info;
+                            }
+                        }
+                    }
+                    if (bestMatch) complexInfo = bestMatch;
+                }
+
+                const households = complexInfo?.totalHouseholdCount || 0;
+
+                uniqueMap.set(item.atclNo, {
+                    ...item,
+                    _dongName: dongName,
+                    _households: households
+                });
             }
         });
 
@@ -671,11 +790,20 @@ export class NaverLandService {
             const spc1 = typeof item.spc1 === 'string' ? parseFloat(item.spc1) : (Number(item.spc1) || 0);
             const price = typeof item.prc === 'number' ? item.prc : (parseInt(item.prc) || 0);
 
+            // Extract room information from tagList or raw field
+            const tags = Array.isArray(item.tagList) ? item.tagList : [];
+            // Naver Mobile GET API uses Korean tags like '방네개이상' or '방다섯개이상'
+            const has4Rooms = tags.includes('FOURROOM') ||
+                tags.includes('방네개이상') ||
+                tags.includes('방다섯개이상') ||
+                tags.includes('대형평수') ||
+                (item.rom && parseInt(item.rom) >= 4);
+
             return {
                 id: String(item.atclNo || Math.random().toString(36).substr(2, 9)),
-                name: item.atclNm || 'Unknown Property',
+                name: item.atclNm || item.atclName || 'Unknown Property',
                 price: price,
-                households: 0,
+                households: item._households || 0,
                 area: {
                     m2: spc1,
                     pyeong: spc1 > 0 ? Math.round(spc1 / 3.3058) : 0
@@ -684,11 +812,34 @@ export class NaverLandService {
                 note: undefined,
                 _rawPrice: price,
                 dongName: item._dongName || '-',
-                cortarNo: item.cortarNo || ''
+                cortarNo: item.cortarNo || '',
+                _has4Rooms: has4Rooms
             };
         });
 
-        articles.sort((a, b) => {
+        // Final Filter based on Criteria (Room Count, Households, Price Range)
+        const filteredList = articles.filter(p => {
+            if (!p) return false;
+
+            // 1. Price Max (Code-side check for 100% safety)
+            if (criteria?.priceMax && p.price > criteria.priceMax) return false;
+
+            // 2. Room Count (4+) - Include fallback for missing tags
+            if (criteria?.roomCount && criteria.roomCount >= 4 && !p._has4Rooms) {
+                // If it's a very large area but tags are missing, maybe we should keep it? 
+                // For now, stick to the tags found by subagent.
+                return false;
+            }
+
+            // 3. Households (100+)
+            if (criteria?.minHouseholds && p.households < criteria.minHouseholds) {
+                return false;
+            }
+
+            return true;
+        });
+
+        filteredList.sort((a, b) => {
             const dongA = a.dongName || '';
             const dongB = b.dongName || '';
             if (dongA !== dongB) {
@@ -697,7 +848,7 @@ export class NaverLandService {
             return a.price - b.price;
         });
 
-        return articles;
+        return filteredList;
     }
 
     /**

@@ -42,40 +42,30 @@ export async function searchProperties(data: FilterValues): Promise<Property[]> 
             priceMax: priceMaxManWon > 0 ? priceMaxManWon : undefined,
             areaMin: data.areaMin || undefined,
             roomCount: data.roomCount || undefined,
+            minHouseholds: data.minHouseholds || undefined,
         };
 
         // 3. Parallel Search across points to beat 10s timeout
         const fetchStart = Date.now();
 
-        // Timeout promise: Return empty (or error info) after 13.5 seconds
+        // Timeout promise: Return empty (or error info) after 100 seconds
         const timeoutPromise = new Promise<Property[]>((_, reject) =>
-            setTimeout(() => reject(new Error('네이버 검색 서버 응답 지연 (50초 초과)')), 50000)
+            setTimeout(() => reject(new Error('네이버 검색 서버 응답 지연 (100초 초과)')), 100000)
         );
 
-        // Vercel Serverless maximum duration can be set if needed
+        // 3. Parallel Search across points to beat 10s timeout
         const searchPromise = (async () => {
             console.log(`[searchProperties] Creating SearchJob for APK Proxy`);
-            const urls = naverLand.generateProxyUrls(cortarNos, criteria);
+            const urls = await naverLand.generateProxyUrls(cortarNos, criteria);
+            console.log(`[searchProperties] Generated ${urls.length} URLs for ${cortarNos.length} regions`);
 
-            // Trigger Android Phone via Join Webhook to wake up and run the app
-            // FORCE use the newly provided URL, ignoring any stale Vercel env var
-            // Cache bypass logic applied cleanly via fetch options without appending unknown parameters (like timestamp) to avoid Join API/Tasker parsing collision.
-            // Using the exact proven URL string from the earliest working commit.
-            const webhookUrl = 'https://joinjoaomgcd.appspot.com/_ah/api/messaging/v1/sendPush?apikey=f78d04c55f3c4d378233c629a08cc669&deviceId=2914080424af4b78acab862f02787791&text=run_proxy';
-            console.log(`[searchProperties] Triggering phone via Join Webhook...`);
-            await fetch(webhookUrl, { cache: 'no-store' }).catch(e => console.error('Join Webhook failed:', e));
-
-            // Give the phone 2 seconds to turn on screen and launch the app before inserting the job
-            await new Promise(resolve => setTimeout(resolve, 2000));
-
-            // 2. CHECK FOR RECENT IDENTICAL JOB (DEDUPLICATION)
-            // Check if there's a PENDING job within the last 2 minutes with same parameters
-            const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000);
+            // 1. CHECK FOR RECENT IDENTICAL JOB (DEDUPLICATION)
+            // Check if there's a PENDING job within the last 30 seconds with same parameters
+            const thirtySecondsAgo = new Date(Date.now() - 30 * 1000);
             const existingJob = await prisma.searchJob.findFirst({
                 where: {
                     status: 'PENDING',
-                    createdAt: { gte: twoMinutesAgo },
-                    // Simple JSON stringify comparison for params
+                    createdAt: { gte: thirtySecondsAgo },
                 }
             });
 
@@ -90,12 +80,19 @@ export async function searchProperties(data: FilterValues): Promise<Property[]> 
                         status: 'PENDING'
                     }
                 });
-                console.log(`[searchProperties] Created Job ${job.id}, waiting for APK Proxy...`);
+                console.log(`[searchProperties] Created Job ${job.id}, triggering phone via Join Webhook...`);
+
+                // Trigger Android Phone via Join Webhook ONLY for new jobs
+                const webhookUrl = 'https://joinjoaomgcd.appspot.com/_ah/api/messaging/v1/sendPush?apikey=f78d04c55f3c4d378233c629a08cc669&deviceId=2914080424af4b78acab862f02787791&text=run_proxy';
+                await fetch(webhookUrl, { cache: 'no-store' }).catch(e => console.error('Join Webhook failed:', e));
             }
 
-            // Poll for completion (up to 48.0s to stay within Vercel execution limits but give max time)
+            // Give the phone 2 seconds to turn on screen and launch the app
+            await new Promise(resolve => setTimeout(resolve, 2000));
+
+            // Poll for completion (up to 95.0s to allow more processing time)
             const proxyStart = Date.now();
-            while (Date.now() - proxyStart < 48000) {
+            while (Date.now() - proxyStart < 95000) {
                 const checkJob = await prisma.searchJob.findUnique({
                     where: { id: job.id }
                 });
@@ -103,7 +100,7 @@ export async function searchProperties(data: FilterValues): Promise<Property[]> 
                     const rawItems = (checkJob.result as any[]) || [];
                     console.log(`[searchProperties] Job ${job.id} completed! raw=${rawItems.length}`);
                     // Map raw Naver API format (spc1, prc, atclNo) → Property format (area, price, id)
-                    const mapped = naverLand.mapNaverItemsToProperties(rawItems);
+                    const mapped = naverLand.mapNaverItemsToProperties(rawItems, (checkJob.params as any).criteria);
                     console.log(`[searchProperties] Mapped to ${mapped.length} Property items`);
                     return mapped;
                 }
@@ -111,6 +108,13 @@ export async function searchProperties(data: FilterValues): Promise<Property[]> 
                     throw new Error('안드로이드 프록시 측 검색 오류 발생');
                 }
                 await new Promise(resolve => setTimeout(resolve, 600)); // Poll every 600ms
+            }
+            // If loop finishes without status COMPLETED, try to return partial results if available
+            const finalCheck = await prisma.searchJob.findUnique({ where: { id: job.id } });
+            const partialItems = (finalCheck?.result as any[]) || [];
+            if (partialItems.length > 0) {
+                console.log(`[searchProperties] Returning ${partialItems.length} partial articles for Job ${job.id}`);
+                return naverLand.mapNaverItemsToProperties(partialItems, (finalCheck?.params as any)?.criteria || criteria);
             }
             throw new Error('안드로이드 홈서버 앱이 멈춰있거나 오프라인입니다.');
         })();
@@ -121,8 +125,8 @@ export async function searchProperties(data: FilterValues): Promise<Property[]> 
             results = await Promise.race([searchPromise, timeoutPromise]);
             isSuccess = true;
         } catch (e: any) {
-            console.warn(`[searchProperties] Timeout or Error: ${e.message}`);
-            // Return a special debug item so we know it timed out
+            console.warn(`[searchProperties] Timeout Handling: ${e.message}`);
+            // Special: If we have a SearchJob ID, try one last time to get whatever was stored
             results = [{
                 id: 'TIMEOUT_ERR',
                 name: `[서버 지연] 검색 시간이 너무 오래 걸려 중단되었습니다 (${e.message})`,
@@ -214,18 +218,13 @@ export async function searchProperties(data: FilterValues): Promise<Property[]> 
                 console.error('Failed to send telegram notification:', e);
             }
 
-            // Delayed Webhook (5 seconds after UI renders)
+            // Delayed Webhook (5 seconds after UI renders) - REMOVED redundant trigger
+            /*
             if (isSuccess) {
                 try {
-                    await new Promise(resolve => setTimeout(resolve, 5000));
-                    const baseWebhookUrl = 'https://joinjoaomgcd.appspot.com/_ah/api/messaging/v1/sendPush?apikey=f78d04c55f3c4d378233c629a08cc669&text=run_proxy&deviceId=2914080424af4b78acab862f02787791';
-                    const finishWebhookUrl = baseWebhookUrl.replace('text=run_proxy', 'text=scraping_done');
-                    console.log(`[searchProperties] Triggering delayed finish webhook (5s): scraping_done`);
-                    await fetch(finishWebhookUrl);
-                } catch (e) {
-                    console.error('Delayed Finish Webhook failed:', e);
-                }
+                ...
             }
+            */
         })();
 
         return filtered;
