@@ -55,11 +55,14 @@ export async function searchProperties(data: FilterValues): Promise<Property[]> 
 
         // 3. Parallel Search across points to beat 10s timeout
         const searchPromise = (async () => {
-            // Cleanup stuck jobs (older than 10 mins) to prevent congestion (v1.6.7)
+            // Cleanup stuck jobs (older than 10 mins) to prevent congestion (v1.6.8)
             const tenMinsAgo = new Date(Date.now() - 10 * 60 * 1000);
             try {
                 await prisma.searchJob.updateMany({
-                    where: { status: 'PROCESSING', createdAt: { lt: tenMinsAgo } },
+                    where: {
+                        status: { in: ['PENDING', 'PROCESSING'] },
+                        createdAt: { lt: tenMinsAgo }
+                    },
                     data: { status: 'ERROR' }
                 });
             } catch (e) {
@@ -326,14 +329,20 @@ export async function sendScrapingDoneSignal() {
     try {
         const apiKey = process.env.JOIN_API_KEY || 'f78d04c55f3c4d378233c629a08cc669';
         const deviceId = process.env.JOIN_DEVICE_ID || '2914080424af4b78acab862f02787791';
+
+        // Ensure apikey is used as query param as per standard Join API
         const webhookUrl = `https://joinjoaomgcd.appspot.com/_ah/api/messaging/v1/sendPush?apikey=${apiKey}&deviceId=${deviceId}&text=scraping_done`;
 
-        console.log(`[sendScrapingDoneSignal] Sending scraping_done signal to phone...`);
+        console.log(`[sendScrapingDoneSignal] Triggering Join push for scraping_done...`);
         const res = await fetch(webhookUrl, { cache: 'no-store' });
-        console.log(`[sendScrapingDoneSignal] Join Webhook response: ${res.status} ${res.statusText}`);
-        return { success: true };
+        const text = await res.text();
+
+        console.log(`[sendScrapingDoneSignal] Join Response: ${res.status} ${res.statusText}`);
+        console.log(`[sendScrapingDoneSignal] Payload: ${text.substring(0, 100)}...`);
+
+        return { success: res.ok };
     } catch (e: any) {
-        console.error('[sendScrapingDoneSignal] Failed to send signal:', e.message);
+        console.error('[sendScrapingDoneSignal] CRITICAL ERROR:', e.message);
         return { success: false, error: e.message };
     }
 }

@@ -72,14 +72,13 @@ export function SearchContent({ initialData }: SearchContentProps) {
             setSearchTime(dayjs().format('YYYY-MM-DD HH:mm:ss'));
             setLoadingMessage(null);
 
-            // Send 'scraping_done' signal to Tasker after 3 seconds (v1.6.7)
-            if (results && results.length > 0 && results[0]?.id !== 'TIMEOUT_ERR') {
-                scrapingDoneTimeout.current = setTimeout(async () => {
-                    console.log('[handleSearch] Sending scraping_done signal via Action...');
-                    await sendScrapingDoneSignal();
-                    scrapingDoneTimeout.current = null;
-                }, 3000);
-            }
+            // Send 'scraping_done' signal to Tasker after 3 seconds (v1.6.8)
+            // Even if 0 results or timeout, we signal so Tasker can close browser.
+            scrapingDoneTimeout.current = setTimeout(async () => {
+                console.log('[handleSearch] Sending scraping_done signal via Action...');
+                await sendScrapingDoneSignal();
+                scrapingDoneTimeout.current = null;
+            }, 3000);
         } catch (error: any) {
             console.error('[handleSearch] Search failed:', error);
             setLoadingMessage(`에러 발생: ${error.message || 'Unknown'}`);
@@ -186,7 +185,7 @@ export function SearchContent({ initialData }: SearchContentProps) {
                     {!searched && !loading && <Text c="dimmed" ta="center" py="xl">검색 조건을 입력하고 검색 버튼을 눌러주세요.</Text>}
 
                     <Text c="dimmed" size="xs" ta="center" mt="xl">
-                        Real Estate Bot v3.0-TS-20240227-1855 (Mobile Proxy Active)
+                        Real Estate Bot v1.6.8 (Mobile Proxy Active)
                     </Text>
                 </Box>
             </Stack>
