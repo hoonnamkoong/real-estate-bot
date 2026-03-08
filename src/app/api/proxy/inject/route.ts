@@ -19,8 +19,14 @@ export async function GET() {
             }
         });
 
-        const webhookUrl = 'https://joinjoaomgcd.appspot.com/_ah/api/messaging/v1/sendPush?apikey=f78d04c55f3c4d378233c629a08cc669&text=run_proxy&deviceId=2914080424af4b78acab862f02787791';
-        await fetch(webhookUrl).catch(e => console.error('Join Webhook failed:', e));
+        const apiKey = process.env.JOIN_API_KEY || 'f78d04c55f3c4d378233c629a08cc669';
+        const deviceId = process.env.JOIN_DEVICE_ID || '2914080424af4b78acab862f02787791';
+        const webhookUrl = `https://joinjoaomgcd.appspot.com/_ah/api/messaging/v1/sendPush?apikey=${apiKey}&text=run_proxy&deviceId=${deviceId}`;
+
+        console.log(`[inject] Triggering Join Webhook (Device: ${deviceId})...`);
+        fetch(webhookUrl).then(res => {
+            console.log(`[inject] Join Webhook response: ${res.status} ${res.statusText}`);
+        }).catch(e => console.error('[inject] Join Webhook failed:', e));
 
         return NextResponse.json({ success: true, job });
     } catch (e: any) {

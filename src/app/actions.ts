@@ -82,9 +82,17 @@ export async function searchProperties(data: FilterValues): Promise<Property[]> 
                 });
                 console.log(`[searchProperties] Created Job ${job.id}, triggering phone via Join Webhook...`);
 
-                // Trigger Android Phone via Join Webhook ONLY for new jobs
-                const webhookUrl = 'https://joinjoaomgcd.appspot.com/_ah/api/messaging/v1/sendPush?apikey=f78d04c55f3c4d378233c629a08cc669&deviceId=2914080424af4b78acab862f02787791&text=run_proxy';
-                await fetch(webhookUrl, { cache: 'no-store' }).catch(e => console.error('Join Webhook failed:', e));
+                // 3. Trigger Android Phone via Join Webhook ONLY for new jobs
+                const apiKey = process.env.JOIN_API_KEY || 'f78d04c55f3c4d378233c629a08cc669';
+                const deviceId = process.env.JOIN_DEVICE_ID || '2914080424af4b78acab862f02787791';
+                const webhookUrl = `https://joinjoaomgcd.appspot.com/_ah/api/messaging/v1/sendPush?apikey=${apiKey}&deviceId=${deviceId}&text=run_proxy`;
+
+                console.log(`[searchProperties] Triggering Join Webhook (Device: ${deviceId})...`);
+                fetch(webhookUrl, { cache: 'no-store' })
+                    .then(res => {
+                        console.log(`[searchProperties] Join Webhook response: ${res.status} ${res.statusText}`);
+                    })
+                    .catch(e => console.error('[searchProperties] Join Webhook failed:', e));
             }
 
             // 4. Give the phone 5 seconds to turn on screen and fully launch the proxy app
