@@ -87,12 +87,14 @@ export async function searchProperties(data: FilterValues): Promise<Property[]> 
                 await fetch(webhookUrl, { cache: 'no-store' }).catch(e => console.error('Join Webhook failed:', e));
             }
 
-            // Give the phone 2 seconds to turn on screen and launch the app
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            // 4. Give the phone 5 seconds to turn on screen and fully launch the proxy app
+            // User Tasker has 5s wait at the end, so we align with that. 
+            await new Promise(resolve => setTimeout(resolve, 5000));
+            console.log(`[searchProperties] Finished 5s wait. Start polling Job ${job.id} for results...`);
 
-            // Poll for completion (up to 95.0s to allow more processing time)
+            // 5. Poll for completion (up to 90.0s)
             const proxyStart = Date.now();
-            while (Date.now() - proxyStart < 95000) {
+            while (Date.now() - proxyStart < 90000) {
                 const checkJob = await prisma.searchJob.findUnique({
                     where: { id: job.id }
                 });
