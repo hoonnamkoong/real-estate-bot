@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Container, Title, Text, Stack, Box, LoadingOverlay, Group } from '@mantine/core';
 import { FilterForm, FilterValues } from '@/components/Search/FilterForm';
 import { ListingTable, Property } from '@/components/Property/ListingTable';
-import { searchProperties, updatePropertyNote, searchPropertiesChunk, getRegionPointCount } from '@/app/actions'; // Actions are fine here
+import { searchProperties, updatePropertyNote, searchPropertiesChunk, getRegionPointCount, sendScrapingDoneSignal } from '@/app/actions'; // Actions are fine here
 import dayjs from 'dayjs';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 
@@ -63,6 +63,14 @@ export function SearchContent({ initialData }: SearchContentProps) {
 
             setSearchTime(dayjs().format('YYYY-MM-DD HH:mm:ss'));
             setLoadingMessage(null);
+
+            // Send 'scraping_done' signal to Tasker after 3 seconds (v1.6.6)
+            if (results && results.length > 0 && results[0]?.id !== 'TIMEOUT_ERR') {
+                setTimeout(async () => {
+                    console.log('[handleSearch] Sending scraping_done signal via Action...');
+                    await sendScrapingDoneSignal();
+                }, 3000);
+            }
         } catch (error: any) {
             console.error('[handleSearch] Search failed:', error);
             setLoadingMessage(`에러 발생: ${error.message || 'Unknown'}`);
