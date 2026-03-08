@@ -55,6 +55,17 @@ export async function searchProperties(data: FilterValues): Promise<Property[]> 
 
         // 3. Parallel Search across points to beat 10s timeout
         const searchPromise = (async () => {
+            // Cleanup stuck jobs (older than 10 mins) to prevent congestion (v1.6.7)
+            const tenMinsAgo = new Date(Date.now() - 10 * 60 * 1000);
+            try {
+                await prisma.searchJob.updateMany({
+                    where: { status: 'PROCESSING', createdAt: { lt: tenMinsAgo } },
+                    data: { status: 'ERROR' }
+                });
+            } catch (e) {
+                console.error('[Cleanup] Failed to clean stuck jobs', e);
+            }
+
             console.log(`[searchProperties] Creating SearchJob for APK Proxy`);
             const urls = await naverLand.generateProxyUrls(cortarNos, criteria);
             console.log(`[searchProperties] Generated ${urls.length} URLs for ${cortarNos.length} regions`);

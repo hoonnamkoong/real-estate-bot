@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Container, Title, Text, Stack, Box, LoadingOverlay, Group } from '@mantine/core';
 import { FilterForm, FilterValues } from '@/components/Search/FilterForm';
 import { ListingTable, Property } from '@/components/Property/ListingTable';
@@ -18,6 +18,7 @@ export function SearchContent({ initialData }: SearchContentProps) {
     useEffect(() => {
         console.log('[SearchContent] Initial Data Received:', JSON.stringify(initialData, null, 2));
     }, [initialData]);
+    const scrapingDoneTimeout = useRef<NodeJS.Timeout | null>(null);
     // Initialize with snapshot results if available
     const [properties, setProperties] = useState<Property[]>(initialData?.results || []);
     const [loading, setLoading] = useState(false);
@@ -40,6 +41,13 @@ export function SearchContent({ initialData }: SearchContentProps) {
 
     const handleSearch = async (values: FilterValues) => {
         console.log('[handleSearch] Starting search with:', values);
+
+        // Cancel any pending scraping_done signal if we start a new search (v1.6.7)
+        if (scrapingDoneTimeout.current) {
+            console.log('[handleSearch] Clearing previous scraping_done timeout...');
+            clearTimeout(scrapingDoneTimeout.current);
+            scrapingDoneTimeout.current = null;
+        }
 
         // 1. URL Update
         const params = new URLSearchParams();
@@ -64,11 +72,12 @@ export function SearchContent({ initialData }: SearchContentProps) {
             setSearchTime(dayjs().format('YYYY-MM-DD HH:mm:ss'));
             setLoadingMessage(null);
 
-            // Send 'scraping_done' signal to Tasker after 3 seconds (v1.6.6)
+            // Send 'scraping_done' signal to Tasker after 3 seconds (v1.6.7)
             if (results && results.length > 0 && results[0]?.id !== 'TIMEOUT_ERR') {
-                setTimeout(async () => {
+                scrapingDoneTimeout.current = setTimeout(async () => {
                     console.log('[handleSearch] Sending scraping_done signal via Action...');
                     await sendScrapingDoneSignal();
+                    scrapingDoneTimeout.current = null;
                 }, 3000);
             }
         } catch (error: any) {
