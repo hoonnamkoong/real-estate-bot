@@ -71,7 +71,7 @@ export async function searchProperties(data: FilterValues): Promise<Property[]> 
 
             let job;
             if (existingJob && JSON.stringify((existingJob.params as any)?.urls) === JSON.stringify(urls)) {
-                console.log(`[searchProperties] Reusing existing PENDING Job ${existingJob.id} instead of creating duplicate.`);
+                console.log(`[searchProperties] Reusing existing PENDING Job ${existingJob.id}.`);
                 job = existingJob;
             } else {
                 job = await prisma.searchJob.create({
@@ -80,20 +80,20 @@ export async function searchProperties(data: FilterValues): Promise<Property[]> 
                         status: 'PENDING'
                     }
                 });
-                console.log(`[searchProperties] Created Job ${job.id}, triggering phone via Join Webhook...`);
-
-                // 3. Trigger Android Phone via Join Webhook ONLY for new jobs
-                const apiKey = process.env.JOIN_API_KEY || 'f78d04c55f3c4d378233c629a08cc669';
-                const deviceId = process.env.JOIN_DEVICE_ID || '2914080424af4b78acab862f02787791';
-                const webhookUrl = `https://joinjoaomgcd.appspot.com/_ah/api/messaging/v1/sendPush?apikey=${apiKey}&deviceId=${deviceId}&text=run_proxy`;
-
-                console.log(`[searchProperties] Triggering Join Webhook (Device: ${deviceId})...`);
-                fetch(webhookUrl, { cache: 'no-store' })
-                    .then(res => {
-                        console.log(`[searchProperties] Join Webhook response: ${res.status} ${res.statusText}`);
-                    })
-                    .catch(e => console.error('[searchProperties] Join Webhook failed:', e));
+                console.log(`[searchProperties] Created Job ${job.id}.`);
             }
+
+            // 3. ALWAYS trigger phone via Join Webhook to ensure it's awake and picks up the job
+            const apiKey = process.env.JOIN_API_KEY || 'f78d04c55f3c4d378233c629a08cc669';
+            const deviceId = process.env.JOIN_DEVICE_ID || '2914080424af4b78acab862f02787791';
+            const webhookUrl = `https://joinjoaomgcd.appspot.com/_ah/api/messaging/v1/sendPush?apikey=${apiKey}&deviceId=${deviceId}&text=run_proxy`;
+
+            console.log(`[searchProperties] Poking phone via Join (Cmd: run_proxy)...`);
+            fetch(webhookUrl, { cache: 'no-store' })
+                .then(res => {
+                    console.log(`[searchProperties] Join Webhook response: ${res.status} ${res.statusText}`);
+                })
+                .catch(e => console.error('[searchProperties] Join Webhook failed:', e));
 
             // 4. Give the phone 5 seconds to turn on screen and fully launch the proxy app
             // User Tasker has 5s wait at the end, so we align with that. 
