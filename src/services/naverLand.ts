@@ -467,9 +467,10 @@ export class NaverLandService {
         const expandedCortarNos = new Set<string>();
         const dongMeta: Record<string, { lat: number, lon: number }> = {};
 
-        // Expansion logic: If a Gu code is provided (ending in 000000), expand to its Dongs
+        // 1. Resolve Dong codes and their centers
         for (const code of cortarNos) {
             if (this.DONG_CORTAR_REGISTRY[code]) {
+                // Gu code: Expand to registered Dongs
                 this.DONG_CORTAR_REGISTRY[code].forEach(d => {
                     expandedCortarNos.add(d.cortarNo);
                     if (!dongMeta[d.cortarNo]) {
@@ -477,6 +478,7 @@ export class NaverLandService {
                     }
                 });
             } else {
+                // Single Dong code: Use as is
                 expandedCortarNos.add(code);
                 if (!dongMeta[code]) {
                     dongMeta[code] = this.getRegionCoords(code);
@@ -486,92 +488,47 @@ export class NaverLandService {
 
         const urls: string[] = [];
         const dongs = Array.from(expandedCortarNos);
-        const batchSize = 10; // Discovery is safe to parallelize more aggressively
 
-        console.log(`[generateProxyUrls] Start scanning ${dongs.length} dongs with batchSize ${batchSize}`);
+        // 2. Generate Region-level Cluster URLs for each Dong (NO server-side fetch needed)
+        // This avoids Vercel IP blocks as discovery is now handled by the mobile proxy via cluster API.
+        for (const cortarNo of dongs) {
+            const meta = dongMeta[cortarNo] || { lat: 37.514, lon: 127.105 };
+            const { lat, lon } = meta;
 
-        for (let i = 0; i < dongs.length; i += batchSize) {
-            const batch = dongs.slice(i, i + batchSize);
+            // Use a generous bounding box to cover the entire Dong
+            const btm = lat - 0.015;
+            const top = lat + 0.015;
+            const lft = lon - 0.015;
+            const rgt = lon + 0.015;
 
-            await Promise.all(batch.map(async (cortarNo) => {
-                try {
-                    let complexes = await this.getComplexesByDong(cortarNo);
-                    console.log(`[generateProxyUrls] Dong ${cortarNo}: Found ${complexes.length} complexes`);
+            // Generate 3 pages per Dong for broad coverage
+            for (let page = 1; page <= 3; page++) {
+                const params = new URLSearchParams();
+                params.append('cortarNo', cortarNo);
+                // Property Type Mapping (APT, ABYG, JGC, OPST, OR)
+                params.append('rletTpCd', 'APT:ABYG:JGC:OPST:OR');
+                params.append('tradTpCd', criteria.tradeType || 'A1');
+                params.append('z', '14'); // Regional zoom level
+                params.append('lat', lat.toString());
+                params.append('lon', lon.toString());
+                params.append('btm', btm.toFixed(7));
+                params.append('lft', lft.toFixed(7));
+                params.append('top', top.toFixed(7));
+                params.append('rgt', rgt.toFixed(7));
+                params.append('page', page.toString());
 
-                    // Optimization for large regions: Represent each dong with its top complexes to avoid timeout
-                    // Songpa-gu can have 20+ dongs, each with 100+ complexes. 100s limit is tight.
-                    if (dongs.length > 2) {
-                        // High-Priority Scan: Top 5 APT + Top 2 OPST per dong to ensure total URLs < 200
-                        const apts = complexes.filter(c => ['A01', 'APT', 'ABYG', 'JGC'].includes(c.realEstateTypeCode))
-                            .sort((a, b) => (b.totalHouseholdCount || 0) - (a.totalHouseholdCount || 0));
-                        const opsts = complexes.filter(c => ['OPST', 'OR'].includes(c.realEstateTypeCode))
-                            .sort((a, b) => (b.totalHouseholdCount || 0) - (a.totalHouseholdCount || 0));
+                // Filters (API level)
+                if (criteria.priceMax) params.append('prc', `0:${criteria.priceMax}`);
+                if (criteria.areaMin) params.append('spcMin', String(Math.floor(criteria.areaMin)));
+                // Room count (use tag if possible, but proxy will also filter)
+                if (criteria.roomCount === 4) params.append('tag', ':FOURROOM:');
 
-                        complexes = [...apts.slice(0, 5), ...opsts.slice(0, 2)];
-                    } else if (dongs.length <= 2) {
-                        // Single/Double Dong Search (e.g. searching only Jamsil-dong)
-                        // Extremely Tight Limit for "No Filter" scenario to ensure 100s completion
-                        // 10 complexes is enough to prove the dong has results while staying fast.
-                        complexes = complexes.slice(0, 10);
-                    }
-
-                    for (const complex of complexes) {
-                        // Filter complexes: Apartment (A01, APT, ABYG), Ju-sang-bok-hap (JGC), Officetel (OPST, OR)
-                        const isApartment = ['A01', 'APT', 'ABYG', 'JGC', 'OPST', 'OR'].includes(complex.realEstateTypeCode);
-                        if (!isApartment) continue;
-
-                        // Household Filter (e.g. 100+)
-                        if (criteria.minHouseholds && complex.totalHouseholdCount < criteria.minHouseholds) continue;
-
-                        const complexNo = String(complex.complexNumber);
-                        const complexName = complex.complexName;
-
-                        // Store in cache for mapping phase
-                        this.COMPLEX_CACHE.set(complexNo, {
-                            totalHouseholdCount: complex.totalHouseholdCount,
-                            name: complexName
-                        });
-
-                        // Bbox generation: Use complex center if available, else dong center
-                        const lat = complex.lat || dongMeta[cortarNo]?.lat || 37.514;
-                        const lon = complex.lon || dongMeta[cortarNo]?.lon || 127.105;
-
-                        // Sub-complexes capture (radius ~1.5km)
-                        const btm = lat - 0.015;
-                        const top = lat + 0.015;
-                        const lft = lon - 0.015;
-                        const rgt = lon + 0.015;
-
-                        // Max 1 page per complex to stay within 48s limit
-                        const params = new URLSearchParams();
-                        params.append('itemId', complexNo);
-                        params.append('rletTpCd', 'APT:ABYG:JGC:OPST');
-                        params.append('tradTpCd', criteria.tradeType === 'B1' ? 'A1:B1' : criteria.tradeType === 'B2' ? 'A1:B2' : criteria.tradeType || 'A1');
-                        params.append('z', '16');
-                        params.append('lat', lat.toString());
-                        params.append('lon', lon.toString());
-                        params.append('btm', btm.toString());
-                        params.append('lft', lft.toString());
-                        params.append('top', top.toString());
-                        params.append('rgt', rgt.toString());
-                        params.append('page', '1');
-                        params.append('addon', 'COMPLEX');
-                        params.append('cortarNo', cortarNo);
-
-                        // Serverside early filter
-                        if (criteria.priceMax) params.append('dprcMax', String(criteria.priceMax));
-                        if (criteria.areaMin) params.append('spcMin', String(Math.floor(criteria.areaMin)));
-
-                        const finalUrl = `${NAVER_LAND_MOBILE_HOST}/cluster/ajax/articleList?${params.toString()}`;
-                        urls.push(finalUrl);
-                    }
-                } catch (e) {
-                    console.error(`[generateProxyUrls] Error processing dong ${cortarNo}:`, e);
-                }
-            }));
+                const url = `${NAVER_LAND_MOBILE_HOST}/cluster/ajax/articleList?${params.toString()}`;
+                urls.push(url);
+            }
         }
 
-        console.log(`[generateProxyUrls] Produced ${urls.length} target URLs`);
+        console.log(`[generateProxyUrls] Generated ${urls.length} regional cluster URLs for ${dongs.length} dongs. (v1.6.3)`);
         return urls;
     }
 
