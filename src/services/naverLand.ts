@@ -796,17 +796,17 @@ export class NaverLandService {
             if (!p) return false;
 
             // 1. Price Max (Code-side check for 100% safety)
-            if (criteria?.priceMax && p.price > criteria.priceMax) return false;
+            if (criteria?.priceMax && p.price > (criteria.priceMax + 100)) return false; // Allow small buffer
 
-            // 2. Room Count (4+) - Include fallback for missing tags
+            // 2. Room Count (4+) - RELAXED for v1.6.5 to ensure visibility
+            // Proxy already filters by tag in the URL, so we trust it if tag info is missing.
             if (criteria?.roomCount && criteria.roomCount >= 4 && !p._has4Rooms) {
-                // If it's a very large area but tags are missing, maybe we should keep it? 
-                // For now, stick to the tags found by subagent.
-                return false;
+                // If it's a large area (>100m2), it's likely 4 rooms even if tag is missing.
+                if (p.area.m2 < 100) return false;
             }
 
-            // 3. Households (100+)
-            if (criteria?.minHouseholds && p.households < criteria.minHouseholds) {
+            // 3. Households (100+) - RELAXED as we don't have COMPLEX_CACHE in v1.6.5
+            if (criteria?.minHouseholds && p.households > 0 && p.households < criteria.minHouseholds) {
                 return false;
             }
 
