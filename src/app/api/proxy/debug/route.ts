@@ -8,7 +8,7 @@ export async function GET() {
         const jobs = await prisma.searchJob.findMany({
             orderBy: { createdAt: 'desc' },
             take: 5,
-            select: { id: true, status: true, createdAt: true }
+            select: { id: true, status: true, params: true, createdAt: true }
         });
 
         const latestCompleted = await prisma.searchJob.findFirst({
