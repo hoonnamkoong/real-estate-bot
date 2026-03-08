@@ -501,8 +501,8 @@ export class NaverLandService {
             const lft = lon - 0.015;
             const rgt = lon + 0.015;
 
-            // Generate 3 pages per Dong for broad coverage
-            for (let page = 1; page <= 3; page++) {
+            // Generate 1 page per Dong for speed and reliability (v1.6.4)
+            for (let page = 1; page <= 1; page++) {
                 const params = new URLSearchParams();
                 params.append('cortarNo', cortarNo);
                 // Property Type Mapping (APT, ABYG, JGC, OPST, OR)
