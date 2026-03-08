@@ -528,7 +528,7 @@ export class NaverLandService {
             }
         }
 
-        console.log(`[generateProxyUrls] Generated ${urls.length} regional cluster URLs for ${dongs.length} dongs. (v1.6.3)`);
+        console.log(`[generateProxyUrls] Generated ${urls.length} regional cluster URLs for ${dongs.length} dongs. (v1.6.4)`);
         return urls;
     }
 
