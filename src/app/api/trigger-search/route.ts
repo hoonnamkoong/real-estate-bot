@@ -36,7 +36,7 @@ export async function POST(request: Request) {
             roomCount: lastSetting.roomCount ?? undefined,
         };
 
-        const urls = naverLand.generateProxyUrls(cortarNos, criteria);
+        const urls = await naverLand.generateProxyUrls(cortarNos, criteria);
 
         const job = await prisma.searchJob.create({
             data: {
